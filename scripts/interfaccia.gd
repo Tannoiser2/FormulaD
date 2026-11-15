@@ -27,6 +27,13 @@ var velo: Control
 var opz_scelta: Dictionary = {}
 var auto_plancia := -1
 var _pannelli: Array = []
+var b_segui: Button
+var marcia_vista := 0         # la marcia toccata una volta: si vedono le caselle, il secondo tocco conferma
+
+## Il pulsante dice se la telecamera insegue le mosse oppure resta dove la si mette.
+func segna_segui(si: bool) -> void:
+	b_segui.text = "Telecamera: segue" if si else "Telecamera: ferma"
+	b_segui.modulate = Color.WHITE if si else Color(1.0, 0.85, 0.3)
 
 func _ready() -> void:
 	UI.prepara()
@@ -48,11 +55,14 @@ func _ready() -> void:
 	barra_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	barra_info.clip_text = true
 	hb.add_child(barra_info)
-	for b in [["Gira a sinistra", "gira_sx"], ["Gira a destra", "gira_dx"], ["Inclina", "inclina"], ["Vista intera", "vista"],
-			["Regole", "regole"], ["Menu", "menu"]]:
+	for b in [["Telecamera: segue", "segui"], ["< Gira", "gira_sx"], ["Gira >", "gira_dx"], ["Inclina", "inclina"],
+			["Vista intera", "vista"], ["Regole", "regole"], ["Menu", "menu"]]:
 		var bt := UI.bottone(b[0], 22, UI.FONDO2, 96, 44)
 		bt.pressed.connect(func(): comando.emit(b[1]))
 		hb.add_child(bt)
+		if b[1] == "segui":
+			b_segui = bt
+			bt.custom_minimum_size.x = 190
 	hb.add_child(UI.spazio(6))
 	# classifica a sinistra
 	p_sx = UI.pannello()
@@ -139,6 +149,7 @@ func _mio(i: int) -> bool:
 func aggiorna(vista: Dictionary, mie: Array) -> void:
 	v = vista
 	miei = mie
+	marcia_vista = 0
 	var p := Pista.carica(v.pista)
 	barra_titolo.text = p.nome.to_upper()
 	var giro_max := 0
@@ -321,6 +332,7 @@ func chiedi() -> void:
 		var h := UI.riga(10)
 		h.alignment = BoxContainer.ALIGNMENT_CENTER
 		azione.add_child(h)
+		var vista_o = null
 		for o in v.att.marce:
 			var m := int(o.m)
 			var costo := Dati.testo_usura(v.regole, o.costo)
@@ -329,9 +341,31 @@ func chiedi() -> void:
 				t += "\n-" + costo
 			if o.fuori:
 				t += "\nRITIRO!"
+			if m == marcia_vista:
+				t = "%s\nCONFERMA" % Dati.NOMI_MARCE[m]
+				vista_o = o
 			var b := UI.bottone(t, 26, Dati.COLORI_MARCE[m], 118, 110)
-			b.pressed.connect(func(): decisione.emit({"t": "marcia", "m": m}))
+			if marcia_vista > 0 and m != marcia_vista:
+				b.modulate = Color(1, 1, 1, 0.55)
+			b.pressed.connect(func():
+				if marcia_vista == m:
+					decisione.emit({"t": "marcia", "m": m})
+					return
+				marcia_vista = m
+				chiedi()
+				comando.emit("anteprima"))
 			h.add_child(b)
+		if vista_o != null and vista_o.has("pv"):
+			azione.add_child(UI.testo("In %s, tiro per tiro (il meglio che si può fare):" % Dati.NOMI_MARCE[marcia_vista], 20, UI.GRIGIO, false, 600))
+			var ht := HFlowContainer.new()
+			ht.add_theme_constant_override("h_separation", 6)
+			ht.add_theme_constant_override("v_separation", 6)
+			ht.alignment = FlowContainer.ALIGNMENT_CENTER
+			azione.add_child(ht)
+			for e in vista_o.pv.t:
+				ht.add_child(_esito(int(e[0]), int(e[1]), int(e[2])))
+			azione.add_child(UI.testo("Sul tabellone le caselle dove puoi arrivare. Tocca ancora la marcia per confermare, un'altra per cambiare.", 20, UI.GIALLO, false, 600))
+			return
 		var nota := "Marcia attuale: %s. Si sale di una alla volta; scalare più di una marcia rovina l'auto." % Dati.NOMI_MARCE[int(a.m)]
 		azione.add_child(UI.testo(nota, 20, UI.GRIGIO, false, 600))
 	else:
@@ -343,6 +377,24 @@ func chiedi() -> void:
 			h.add_child(UI.chip(l[0], Vector2(20, 20)))
 			h.add_child(UI.testo(l[1], 18, UI.GRIGIO))
 		azione.add_child(h)
+
+const COL_ESITO := [Mondo.COL_LIBERA, Mondo.COL_COSTO, Mondo.COL_TESTA, Mondo.COL_FUORI]
+
+## Un tiro possibile e che cosa costa nel caso migliore.
+func _esito(tiro: int, liv: int, persi: int) -> Control:
+	var col: Color = COL_ESITO[liv]
+	var p := UI.pannello(col.darkened(0.25), col, 8, 2, 4)
+	p.custom_minimum_size = Vector2(64, 0)
+	var vb := UI.colonna(0)
+	p.add_child(vb)
+	var chiaro := liv == 3
+	var su := UI.testo(str(tiro), 26, UI.CHIARO if chiaro else Color(0.05, 0.05, 0.05), true)
+	su.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(su)
+	var giu := UI.testo(["libera", "perde %d" % persi, "testacoda", "ritiro"][liv], 16, UI.CHIARO if chiaro else Color(0.05, 0.05, 0.05))
+	giu.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(giu)
+	return p
 
 static func testo_opzione(regole: String, o: Dictionary) -> String:
 	var parti := []

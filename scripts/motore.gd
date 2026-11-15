@@ -313,6 +313,50 @@ func prova(a: Dictionary, opz: Dictionary, tiro: int) -> Dictionary:
 	a.pf = pf0
 	return r
 
+## Che cosa può succedere innestando la marcia `opz`: per ogni tiro possibile l'esito migliore, e tutte le
+## caselle dove si può arrivare. {t: [[tiro, livello, punti persi]], c: [opzioni come nella vista]}
+## livello: 0 libera, 1 costa punti, 2 testacoda, 3 ritiro.
+func anteprima(a: Dictionary, opz: Dictionary) -> Dictionary:
+	var valori := {}
+	for f in Dati.DADI[opz.m]:
+		valori[int(f[0])] = true
+	var tiri := valori.keys()
+	tiri.sort()
+	var esiti := []
+	var celle := {}
+	var pesi := {}
+	for tiro in tiri:
+		var r := prova(a, opz, tiro)
+		var meglio := [tiro, 3, 0]
+		var peso_m := INF
+		for cid in r:
+			var e: Dictionary = r[cid].eff
+			var tot := 0
+			for k in e.usura:
+				tot += int(e.usura[k])
+			var liv := 3 if e.fuori != "" else (2 if e.testa else (1 if tot > 0 else 0))
+			var peso := float(liv * 100 + tot)
+			if peso < peso_m:
+				peso_m = peso
+				meglio = [tiro, liv, tot]
+			if not pesi.has(cid) or peso < pesi[cid]:
+				pesi[cid] = peso
+				var p := pista.pos(cid)
+				var voce := {"c": cid, "x": int(p.x), "y": int(p.y)}
+				if not e.usura.is_empty():
+					voce["u"] = e.usura
+				if e.fuori != "":
+					voce["fu"] = e.fuori
+				if e.testa:
+					voce["te"] = true
+				if e.box:
+					voce["bx"] = true
+				if e.finisce:
+					voce["fi"] = true
+				celle[cid] = voce
+		esiti.append(meglio)
+	return {"t": esiti, "c": celle.values()}
+
 func opzioni_per(a: Dictionary, tiro: int) -> Dictionary:
 	var occupate := {}
 	var marce_altre := {}
@@ -657,6 +701,10 @@ func vista() -> Dictionary:
 		var att := {"tipo": s.attesa.tipo, "auto": a.i, "uid": a.uid}
 		if s.attesa.tipo == "marcia":
 			att.marce = marce(a)
+			att.da = a.c
+			if a.tipo != "ia":
+				for o in att.marce:
+					o["pv"] = anteprima(a, o)
 		else:
 			att.tiro = s.attesa.tiro
 			att.da = a.c

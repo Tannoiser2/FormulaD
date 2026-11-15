@@ -52,7 +52,7 @@ const nomi = ['Stefano', 'Chiara', 'Marco', 'Lina'];
 const tel = [];
 for (let i = 0; i < NT; i++) {
   const p = await ctx.newPage();
-  await p.setViewportSize({ width: 390, height: 844 });
+  await p.setViewportSize(i % 2 ? { width: 844, height: 390 } : { width: 390, height: 844 });
   ascolta(p, 'tel' + i);
   await p.goto(`http://localhost:8765/telefono.html?s=${codice}&rete=locale`);
   if (i === 0) await foto(p, 'tel_0_ingresso');
@@ -71,7 +71,7 @@ if (OSPITE) {
   await osp.goto(`http://localhost:8765/index.html?rete=locale&subito&s=${codice}&nome=Ospite&autoguida=1`);
 }
 const t0 = Date.now();
-let fatte = 0, fotoMarcia = false, fotoMossa = false, fotoOspite = 0, fine = false;
+let fatte = 0, fotoMarcia = false, fotoMossa = false, fotoOspite = 0, fine = false, fotoAnte = 0;
 while (Date.now() - t0 < DURATA && !fine) {
   await tv.waitForTimeout(700);
   for (let i = 0; i < tel.length; i++) {
@@ -85,18 +85,22 @@ while (Date.now() - t0 < DURATA && !fine) {
       // la marcia più alta che non costa nulla, ma non oltre la 4a
       const ok = s.att.marce.filter((o) => !o.fuori && Object.keys(o.costo).length === 0 && o.m <= 4);
       const m = (ok.length ? ok[ok.length - 1] : s.att.marce[0]).m;
-      await p.click(`.marcia[data-m="${m}"]`);
+      // due tocchi sulla plancia: il primo mostra dove si può arrivare, il secondo conferma
+      const pt = await p.evaluate((m) => window.FDprova.marcia(m), m);
+      await p.mouse.click(pt.x, pt.y);
+      await p.waitForTimeout(250);
+      if (fatte > 2 && fotoAnte < 4) { await foto(p, `tel_2_anteprima_${i}_${fotoAnte}`); if (!fotoAnte) await foto(tv, 'tv_3b_anteprima_telefono'); fotoAnte++; }
+      await p.mouse.click(pt.x, pt.y);
       fatte++;
     } else {
       // la casella più lontana tra quelle che non costano nulla; se non ce n'è, la meno cara
       const costo = (o) => (o.fu ? 1000 : 0) + (o.te ? 50 : 0) + Object.values(o.u || {}).reduce((a, b) => a + b, 0) * 10 - o.mo;
       const best = [...s.att.opz].sort((a, b) => costo(a) - costo(b))[0];
       if (!fotoMossa && fatte > 5 && await p.locator('#mappa').count()) {
-        await p.evaluate(() => document.getElementById('mappa').scrollIntoView());
-        const b = await p.locator('#mappa').boundingBox();
-        await p.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+        await p.evaluate((c) => window.FDprova.scegli(c), best.c);
         await p.waitForTimeout(300);
         await foto(p, 'tel_3_mossa');
+        for (const q of tel) if (q !== p) await foto(q, 'tel_3_attesa');
         await foto(tv, 'tv_4_mossa_telefono');
         fotoMossa = true;
       }

@@ -8,6 +8,11 @@ Si gioca qui: **https://tannoiser2.github.io/FormulaD/**
 - **Pezzi originali** dal modulo Tabletop Simulator «Formula D: Scripted»: le auto di Formula 1, i sei dadi delle marce
   (che rotolano in 3D), la plancia del pilota (base e avanzata) con i perni dei punti e la leva del cambio, i segnalini
   dei detriti, le carte dei dieci piloti delle cinque scuderie.
+- **Anteprima della marcia**: il primo tocco su una marcia mostra sul tabellone tutte le caselle dove può portare e, tiro per
+  tiro, che cosa costa nel caso migliore; il secondo tocco la conferma. La telecamera si può fermare («Telecamera: ferma»)
+  perché non insegua ogni mossa.
+- **Telefono**: plancia originale con le marce da toccare, punti dell'auto, il pezzo di pista che interessa e l'ordine di
+  gioco; in verticale uno sotto l'altro, in orizzontale plancia a sinistra, pista al centro, ordine a destra.
 - **12 circuiti**: Monaco, Hockenheim, Sebring, Valencia, Singapore, Austin, Buddh, Sochi e quattro tracciati Formula Dé (fra cui Spa-Francorchamps)
   (Monaco, Zandvoort e la sua variante). Ognuno ha la rete completa di caselle, corsie, frecce delle curve, griglia e box.
 - **Regole base e avanzate**, da 1 a 3 giri, fino a 10 auto.

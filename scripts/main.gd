@@ -46,6 +46,8 @@ func _ready() -> void:
 	mondo.casella_toccata.connect(_casella)
 	mondo.carica_pista(Pista.carica("FDMonaco"))
 	menu.ha_salvataggio = rete.carica("fd_gara") != ""
+	mondo.segui = rete.carica("fd_segui") != "0"
+	hud.segna_segui(mondo.segui)
 	menu.principale()
 	if rete.web and not menu.ha_salvataggio:
 		rete.chiedi_remoto()
@@ -77,7 +79,7 @@ func _comando(cosa: String) -> void:
 		var i := int(cosa.split(":")[1])
 		var c: String = mondo.auto_casella.get(i, "")
 		if c != "":
-			mondo.inquadra([c], 3.0)
+			mondo.inquadra([c], 3.0, true)
 		return
 	match cosa:
 		"regole":
@@ -93,6 +95,12 @@ func _comando(cosa: String) -> void:
 			mondo.gira(PI / 6.0)
 		"inclina":
 			mondo.inclina()
+		"segui":
+			mondo.segui = not mondo.segui
+			rete.salva("fd_segui", "1" if mondo.segui else "0")
+			hud.segna_segui(mondo.segui)
+		"anteprima":
+			_anteprima()
 		"menu":
 			var voci := [["Torna alla gara", "chiudi"], ["Schermo intero", "schermo"]]
 			if modo == "stanza":
@@ -276,6 +284,16 @@ func _decisione(az: Dictionary) -> void:
 	if motore.applica(az):
 		mondo.togli_opzioni()
 		_ciclo()
+
+## È stata toccata una marcia: sul tabellone compaiono le caselle dove può portare.
+func _anteprima() -> void:
+	mondo.togli_opzioni()
+	var v: Dictionary = hud.v
+	if v.is_empty() or v.att == null or str(v.att.tipo) != "marcia":
+		return
+	for o in v.att.marce:
+		if int(o.m) == hud.marcia_vista and o.has("pv"):
+			mondo.mostra_opzioni(o.pv.c, str(v.att.get("da", "")))
 
 func _casella(cid: String) -> void:
 	if not mondo.opzioni.has(cid):

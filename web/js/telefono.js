@@ -115,14 +115,36 @@ async function entra() {
 function manda(az) {
   inviata = stato?.n ?? 0;
   scelta = null;
+  marciaVista = 0;
   rete.push(`${RADICE}/${codice}/acts`, { s: uid, k: 'az', v: JSON.stringify({ ...az, n: stato?.n ?? 0 }) });
   disegna();
 }
 
 // ------------------------------------------------------------------ schermate
+// In gara: l'ordine di gioco, la plancia originale (le marce si scelgono lì) e il pezzo di pista che interessa.
+// In verticale uno sotto l'altro; in orizzontale plancia a sinistra, pista al centro, ordine a destra.
+const PLANCIA = { larg: 823, alt: 498, px: 82.3,
+  colX: [0.96, 0.10, -0.77, -1.63, -2.49, -3.35, -4.21], rigaZ: [-2.31, -1.55, -0.78, 0.00, 0.77, 1.55, 2.33],
+  leva: [[2.48, -2.03], [4.23, -1.22], [2.47, -0.40], [4.20, 0.34], [2.45, 1.16], [4.20, 1.94]],
+  righe: { freni: 2, cambio: 3, carrozzeria: 4, motore: 5, tenuta: 6 } };
+const COL_LIV = [COL.libera, COL.costo, COL.testa, COL.fuori];
+const TESTI_LIV = ['libera', '', 'testacoda', 'ritiro'];
+let marciaVista = 0;     // marcia toccata una volta: si vedono le caselle, il secondo tocco conferma
+let nVisto = -1;
+
+function puntoPlancia(x, z) {
+  return stato.regole === 'avanzate' ? [(5 - x) * PLANCIA.px, (z + 3.03) * PLANCIA.px] : [(5 - x) * PLANCIA.px, (3.03 - z) * PLANCIA.px];
+}
+function puntoMarcia(m) {
+  const g = stato.regole === 'avanzate' ? PLANCIA.leva[m - 1] : PLANCIA.leva[6 - m];
+  return puntoPlancia(g[0], g[1]);
+}
+
 function disegna() {
   if (!stato) return;
+  document.body.classList.toggle('gara', stato.fase !== 'attesa');
   if (stato.fase === 'attesa') { attesa(); return; }
+  if (stato.n !== nVisto) { nVisto = stato.n; marciaVista = 0; scelta = null; }
   const io = stato.auto.findIndex((a) => a.u === uid);
   const att = stato.att;
   const tocca = !!att && att.uid === uid && inviata !== stato.n && stato.fase === 'gara';
@@ -131,41 +153,133 @@ function disegna() {
     try { navigator.vibrate?.(250); } catch (e) { /* ok */ }
   }
   toccavaAMe = tocca;
-  let h = '';
-  if (io >= 0) h += testata(stato.auto[io], tocca);
-  else h += `<div class="box"><h2>Spettatore</h2><p class="sotto">La gara è già partita senza un posto per te: puoi seguirla da qui.</p></div>`;
+  const mia = io >= 0 ? stato.auto[io] : null;
+  if (tocca && att.tipo === 'mossa' && scelta) scelta = att.opz.find((o) => o.c === scelta.c) || null;
+  const vistaM = tocca && att.tipo === 'marcia' && marciaVista ? att.marce.find((o) => o.m === marciaVista) : null;
+
+  // ---- che cosa si aspetta
+  let az = '';
   if (stato.fase === 'fine') {
-    const a = io >= 0 ? stato.auto[io] : null;
-    h += `<div class="box mio"><p class="grande">BANDIERA A SCACCHI</p>${a ? `<p class="grande" style="color:#ffd21a">${a.pa > 0 ? a.pa + '° posto' : 'Ritirato'}</p>` : ''}</div>`;
+    az = `<p class="grande">BANDIERA A SCACCHI</p>${mia ? `<p class="grande" style="color:#ffd21a">${mia.pa > 0 ? mia.pa + '° posto' : 'Ritirato'}</p>` : ''}`;
   } else if (tocca && att.tipo === 'marcia') {
-    h += `<div class="box tocca lampo"><h2>Scegli la marcia</h2><div class="marce">` + att.marce.map((o) =>
-      `<button class="marcia" data-m="${o.m}" style="background:${COL_MARCE[o.m]};color:${o.m === 1 ? '#111' : '#fff'}">${MARCE[o.m]}<small>${INTERVALLI[o.m]}</small>` +
-      `${usura(stato.regole, o.costo) ? `<small>-${esc(usura(stato.regole, o.costo))}</small>` : ''}${o.fuori ? '<small>RITIRO!</small>' : ''}</button>`).join('') +
-      `</div><p class="sotto" style="margin-top:8px">Si sale di una marcia alla volta. Scalare più di una marcia rovina l'auto.</p></div>`;
+    if (vistaM) {
+      const costo = usura(stato.regole, vistaM.costo);
+      az = `<h2>${MARCE[vistaM.m]} <small>dado ${INTERVALLI[vistaM.m]}${costo ? ' - perdi ' + esc(costo) : ''}${vistaM.fuori ? ' - RITIRO!' : ''}</small></h2>
+        <div class="esiti">${(vistaM.pv?.t || []).map(([t, l, p]) => `<span style="background:${COL_LIV[l]};color:${l === 3 ? '#fff' : '#111'}"><b>${t}</b>${l === 1 ? '-' + p : TESTI_LIV[l]}</span>`).join('')}</div>
+        <button id="okm" style="background:${COL_MARCE[vistaM.m]};color:${vistaM.m === 1 ? '#111' : '#fff'}">CONFERMA LA ${MARCE[vistaM.m].toUpperCase()}</button>`;
+    } else {
+      az = `<h2>Tocca a te: scegli la marcia</h2><p class="sotto">Tocca una marcia cerchiata sulla plancia: vedrai dove puoi arrivare. Toccala ancora per confermare.</p>`;
+    }
   } else if (tocca && att.tipo === 'mossa') {
-    h += `<div class="box tocca"><h2>Tiro <span class="dado" style="background:${COL_MARCE[stato.auto[io].m]};color:${stato.auto[io].m === 1 ? '#111' : '#fff'}">${att.tiro}</span> in ${MARCE[stato.auto[io].m]}: dove vai?</h2>
-      <div class="mappa"><canvas id="mappa"></canvas></div>
-      <div class="legenda"><span><i style="background:${COL.libera}"></i>libera</span><span><i style="background:${COL.costo}"></i>costa punti</span>
-      <span><i style="background:${COL.testa}"></i>testacoda</span><span><i style="background:${COL.fuori}"></i>ritiro</span>
-      <span><i style="background:${COL.box}"></i>box</span><span><i style="background:${COL.arrivo}"></i>traguardo</span></div>
-      <div id="det" class="dettaglio">Tocca una casella colorata.</div>
-      <button id="ok" class="verde" disabled>CONFERMA</button></div>`;
+    az = `<h2>Tiro <span class="dado" style="background:${COL_MARCE[mia.m]};color:${mia.m === 1 ? '#111' : '#fff'}">${att.tiro}</span> in ${MARCE[mia.m]}</h2>
+      <div id="det" class="dettaglio ${scelta && (scelta.fu || scelta.te) ? 'male' : ''}">${scelta ? esc(testoOpz(stato.regole, scelta)) : 'Tocca una casella colorata sulla pista.'}</div>
+      <button id="ok" class="${scelta && (scelta.fu || scelta.te) ? '' : 'verde'}" ${scelta ? '' : 'disabled'}>CONFERMA</button>`;
   } else if (att) {
     const a = stato.auto[att.auto];
-    h += `<div class="box"><p class="grande" style="color:${colore(a.p)}">${att.uid === uid ? 'Mossa inviata...' : 'Tocca a ' + esc(a.n)}</p></div>`;
+    az = `<p class="grande" style="color:${colore(a.p)}">${att.uid === uid ? 'Mossa inviata...' : 'Tocca a ' + esc(a.n)}</p>`;
+    const ultimo = (stato.log || []).slice(-1)[0];
+    if (ultimo) az += `<p class="sotto">${esc(ultimo)}</p>`;
   }
-  h += classifica(io);
-  h += `<div class="box log">${(stato.log || []).slice(-5).map((t) => `<div>${esc(t)}</div>`).join('')}</div>`;
-  app.innerHTML = h;
-  app.querySelectorAll('.marcia').forEach((b) => { b.onclick = () => manda({ t: 'marcia', m: Number(b.dataset.m) }); });
-  if (tocca && att.tipo === 'mossa') mappa(att);
+  if (!mia) az = `<h2>Spettatore</h2><p class="sotto">La gara è partita senza un posto per te: puoi seguirla da qui.</p>` + (stato.fase === 'fine' ? az : '');
+
+  // ---- la mia auto in breve
+  let testa = '';
+  if (mia) {
+    let st = `${mia.m > 0 ? MARCE[mia.m] : 'in griglia'} - giro ${Math.max(1, Math.min(mia.g, stato.giri))} di ${stato.giri}${mia.d ? ' - tiro ' + mia.d : ''}`;
+    if (mia.pa > 0) st = `ARRIVATO: ${mia.pa}° posto`;
+    else if (mia.f) st = `RITIRATO: ${esc(mia.w)}`;
+    testa = `<div class="chi"><span class="nome" style="color:${colore(mia.p)}">${esc(mia.n)}</span><span class="dati">${st}</span></div>
+      <div class="zone">${ZONE[stato.regole].map(([id, n, c]) =>
+    `<div class="zona ${mia.pf[id] <= 1 ? 'poco' : ''}" style="border-color:${c}"><span>${n}</span><b>${Math.max(0, mia.pf[id])}</b></div>`).join('')}</div>`;
+  }
+
+  app.innerHTML = `<div class="gioco">
+    <div class="ordine">${ordine(io)}</div>
+    <div class="cruscotto ${tocca ? 'tocca' : ''}">${mia ? '<canvas id="plancia"></canvas>' : ''}${testa}<div class="azione">${az}</div></div>
+    <div class="pista"><canvas id="mappa"></canvas></div></div>`;
+  const okm = document.getElementById('okm');
+  if (okm) okm.onclick = () => manda({ t: 'marcia', m: marciaVista });
+  const ok = document.getElementById('ok');
+  if (ok) ok.onclick = () => { if (scelta) manda({ t: 'mossa', c: scelta.c }); };
+  if (mia) plancia(mia, tocca && att.tipo === 'marcia' ? att.marce : []);
+  mappa(mia, tocca ? att : null, vistaM);
+}
+
+function ordine(io) {
+  const att = stato.att;
+  return stato.ordine.map((i) => {
+    const a = stato.auto[i];
+    const fuori = a.pa > 0 || a.f;
+    return `<span class="oc ${att && att.auto === i ? 'turno' : ''} ${i === io ? 'io' : ''} ${fuori ? 'via' : ''}"><i style="background:${colore(a.p)}"></i>
+      <span class="n">${esc(String(a.n).split(' ')[0])}</span><b style="background:${COL_MARCE[a.m]};color:${a.m === 1 ? '#111' : '#fff'}">${a.pa > 0 ? a.pa + '°' : a.f ? 'rit' : a.m > 0 ? MARCE[a.m] : '-'}</b></span>`;
+  }).join('');
+}
+
+// La plancia originale: i perni sui punti rimasti, la leva sulla marcia, le marce che si possono innestare cerchiate.
+function plancia(a, marce) {
+  const cv = document.getElementById('plancia');
+  const nome = stato.regole === 'avanzate' ? 'plancia_avanzata' : 'plancia_base';
+  const im = immagine('img/' + nome + '.webp');
+  const larg = cv.clientWidth || 320;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(larg * dpr);
+  cv.height = Math.round(larg * PLANCIA.alt / PLANCIA.larg * dpr);
+  const s = cv.width / PLANCIA.larg;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#1b2029';
+  g.fillRect(0, 0, cv.width, cv.height);
+  if (im.complete && im.naturalWidth) g.drawImage(im, 0, 0, cv.width, cv.height);
+  const perno = ([x, y], r, col) => {
+    g.beginPath(); g.arc(x * s + 1.5 * s, y * s + 2.5 * s, r * s, 0, 6.2832); g.fillStyle = 'rgba(0,0,0,.45)'; g.fill();
+    g.beginPath(); g.arc(x * s, y * s, r * s, 0, 6.2832); g.fillStyle = '#1f1f24'; g.fill();
+    g.beginPath(); g.arc(x * s, y * s, r * s * 0.82, 0, 6.2832); g.fillStyle = col; g.fill();
+    g.beginPath(); g.arc((x - 4) * s, (y - 4) * s, r * s * 0.3, 0, 6.2832); g.fillStyle = 'rgba(255,255,255,.55)'; g.fill();
+  };
+  if (stato.regole === 'avanzate') {
+    for (const [id, , col] of ZONE.avanzate) {
+      let n = a.pf[id];
+      if (!(n > 0)) continue;
+      if (id === 'gomme') { n = Math.min(n, 14); perno(puntoPlancia(PLANCIA.colX[(n - 1) % 7], PLANCIA.rigaZ[Math.floor((n - 1) / 7)]), 17, col); }
+      else { n = Math.min(n, 7); perno(puntoPlancia(PLANCIA.colX[n - 1], PLANCIA.rigaZ[PLANCIA.righe[id]]), 17, col); }
+    }
+  } else {
+    const n = Math.max(0, Math.min(18, a.pf.ps || 0));
+    if (n > 0) perno(puntoPlancia(PLANCIA.colX[(n - 1) % 3], PLANCIA.rigaZ[6 - Math.floor((n - 1) / 3)]), 17, '#e61a1a');
+  }
+  if (a.m >= 1) perno(puntoMarcia(a.m), 21, stato.regole === 'avanzate' ? '#e61a1a' : '#26262e');
+  for (const o of marce) {
+    const [x, y] = puntoMarcia(o.m);
+    const sel = o.m === marciaVista;
+    g.beginPath();
+    g.arc(x * s, y * s, (sel ? 34 : 29) * s, 0, 6.2832);
+    g.lineWidth = (sel ? 9 : 5) * s;
+    g.strokeStyle = sel ? '#ffffff' : '#ffd21a';
+    g.stroke();
+    if (sel) { g.beginPath(); g.arc(x * s, y * s, 40 * s, 0, 6.2832); g.lineWidth = 3 * s; g.strokeStyle = '#000'; g.stroke(); }
+  }
+  cv.onpointerdown = (ev) => {
+    if (!marce.length) return;
+    const b = cv.getBoundingClientRect();
+    const x = (ev.clientX - b.left) / b.width * PLANCIA.larg, y = (ev.clientY - b.top) / b.height * PLANCIA.alt;
+    let best = null, bd = 75;
+    for (const o of marce) {
+      const [mx, my] = puntoMarcia(o.m);
+      const d = Math.hypot(mx - x, my - y);
+      if (d < bd) { bd = d; best = o; }
+    }
+    if (!best) return;
+    sbloccaAudio();
+    if (marciaVista === best.m) { manda({ t: 'marcia', m: best.m }); return; }
+    marciaVista = best.m;
+    disegna();
+  };
 }
 
 function attesa() {
   const mio = (stato.posti || []).find((p) => p.u === uid);
   let h = `<h1>FORMULA D</h1><div class="box mio"><p class="grande">Stanza ${esc(codice)}</p>`;
   if (mio) {
-    h += `<div class="testa"><img src="img/${PILOTI[mio.p][0]}.webp" alt="" style="border-color:${colore(mio.p)}"><div class="chi"><div class="nome">${esc(nome)}</div>
+    h += `<div class="testa"><span class="col" style="background:${colore(mio.p)}"></span><div class="chi"><div class="nome">${esc(nome)}</div>
       <div class="dati">Guidi l'auto di ${esc(NOMI_PILOTI[mio.p])}, scuderia ${PILOTI[mio.p][1]}. Aspetta il via!</div></div></div>`;
   } else {
     h += `<p class="sotto">Sei dentro, ma non c'è ancora un posto libero per te: chiedi a chi organizza di aprirne uno («Telefono / online»).</p>`;
@@ -180,134 +294,118 @@ function attesa() {
   app.innerHTML = h;
 }
 
-function testata(a, tocca) {
-  const zone = ZONE[stato.regole].map(([id, n, c]) =>
-    `<div class="zona ${a.pf[id] <= 1 ? 'poco' : ''}" style="border-left-color:${c}"><span>${n}</span><b>${Math.max(0, a.pf[id])}</b></div>`).join('');
-  let st = `${a.m > 0 ? MARCE[a.m] : 'in griglia'} - giro ${Math.max(1, Math.min(a.g, stato.giri))} di ${stato.giri}${a.d ? ' - ultimo tiro ' + a.d : ''}`;
-  if (a.pa > 0) st = `ARRIVATO: ${a.pa}° posto`;
-  else if (a.f) st = `RITIRATO: ${esc(a.w)}`;
-  return `<div class="box mio ${tocca ? 'tocca' : ''}"><div class="testa"><img src="img/${PILOTI[a.p][0]}.webp" alt="" style="border-color:${colore(a.p)}">
-    <div class="chi"><div class="nome" style="color:${colore(a.p)}">${esc(a.n)}</div><div class="dati">${st}</div></div></div><div class="zone">${zone}</div></div>`;
-}
-
-function classifica(io) {
-  const att = stato.att;
-  let h = `<div class="box"><h2>Ordine di gioco - turno ${stato.turno}</h2>`;
-  for (const i of stato.ordine) {
-    const a = stato.auto[i];
-    const st = a.pa > 0 ? `${a.pa}° arrivato` : a.f ? 'ritirato' : ZONE[stato.regole].map(([id]) => Math.max(0, a.pf[id])).join(' ');
-    h += `<div class="riga ${att && att.auto === i ? 'turno' : ''} ${i === io ? 'io' : ''}"><span class="col" style="background:${colore(a.p)}"></span>
-      <span class="n">${esc(a.n)}</span><span class="m" style="background:${COL_MARCE[a.m]};color:${a.m === 1 ? '#111' : '#fff'}">${a.m > 0 ? MARCE[a.m] : '-'}</span><span class="p">${st}</span></div>`;
-  }
-  return h + '</div>';
-}
-
-// ------------------------------------------------------------------ mappa delle caselle
-function immagine(pista) {
-  if (!immagini[pista]) {
+// ------------------------------------------------------------------ il pezzo di pista che interessa
+function immagine(src) {
+  if (!immagini[src]) {
     const im = new Image();
-    im.onload = () => { if (stato?.att?.tipo === 'mossa') disegna(); };
-    im.src = `img/piste/${pista}.webp`;
-    immagini[pista] = im;
+    im.onload = () => disegna();
+    im.src = src;
+    immagini[src] = im;
   }
-  return immagini[pista];
+  return immagini[src];
 }
 
-function mappa(att) {
+// att: la decisione che aspetta me (o null); vistaM: la marcia di cui si guarda l'anteprima
+function mappa(mia, att, vistaM) {
   const cv = document.getElementById('mappa');
-  const det = document.getElementById('det');
-  const ok = document.getElementById('ok');
-  const im = immagine(stato.pista);
-  const io = stato.auto[att.auto];
-  // riquadro del tabellone che contiene tutte le caselle possibili
+  const im = immagine(`img/piste/${stato.pista}.webp`);
+  const opz = att && att.tipo === 'mossa' ? att.opz : vistaM?.pv?.c || [];
+  const toccabili = !!att && att.tipo === 'mossa';
+  const iw = stato.iw || 2474;
+  const ih = im.naturalWidth ? iw * im.naturalHeight / im.naturalWidth : iw * 0.65;
+  const qui = mia ? stato.caselle?.[mia.c] : null;
+  // riquadro del tabellone: le caselle possibili e la mia auto; senza caselle, i dintorni della mia auto
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const o of att.opz) { x0 = Math.min(x0, o.x); y0 = Math.min(y0, o.y); x1 = Math.max(x1, o.x); y1 = Math.max(y1, o.y); }
-  const m = 70;
-  x0 -= m; y0 -= m; x1 += m; y1 += m;
-  const larg = cv.clientWidth || 320;
-  const altMax = Math.max(260, Math.min(window.innerHeight * 0.52, 560));
-  let w = Math.max(x1 - x0, 360), hh = Math.max(y1 - y0, 300);
-  // stesse proporzioni del riquadro sullo schermo
-  const prop = Math.min(Math.max(hh / w, 0.55), altMax / larg);
-  if (hh / w > prop) w = hh / prop; else hh = w * prop;
+  const dentro = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+  for (const o of opz) dentro(o.x, o.y);
+  if (qui) dentro(qui[0], qui[1]);
+  if (x0 === Infinity) { x0 = 0; y0 = 0; x1 = iw; y1 = ih; }
+  else {
+    const m = opz.length ? 80 : 300;
+    x0 -= m; y0 -= m; x1 += m; y1 += m;
+  }
+  const larg = cv.parentElement.clientWidth || 320, alt = Math.max(140, cv.parentElement.clientHeight || 240);
+  let w = Math.max(x1 - x0, 380), hh = Math.max(y1 - y0, 260);
+  if (hh / w > alt / larg) w = hh * larg / alt; else hh = w * alt / larg;
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   x0 = cx - w / 2; y0 = cy - hh / 2;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = Math.round(larg * dpr);
-  cv.height = Math.round(larg * prop * dpr);
-  cv.style.height = Math.round(larg * prop) + 'px';
+  cv.height = Math.round(alt * dpr);
+  cv.style.width = larg + 'px';
+  cv.style.height = alt + 'px';
   const k = cv.width / w;            // pixel dello schermo per pixel del tabellone
   const g = cv.getContext('2d');
   const px = (x) => (x - x0) * k, py = (y) => (y - y0) * k;
-  const r = Math.max(9 * dpr, 17 * k);
+  const r = Math.max(8 * dpr, 17 * k);
 
-  function dipingi() {
-    g.fillStyle = '#20242c';
-    g.fillRect(0, 0, cv.width, cv.height);
-    if (im.complete && im.naturalWidth) {
-      const s = im.naturalWidth / (stato.iw || 2474);
-      g.drawImage(im, x0 * s, y0 * s, w * s, hh * s, 0, 0, cv.width, cv.height);
-    }
-    for (const o of att.opz) {
-      g.beginPath();
-      g.arc(px(o.x), py(o.y), scelta && scelta.c === o.c ? r * 1.45 : r, 0, 6.2832);
-      g.fillStyle = coloreOpz(o);
-      g.globalAlpha = 0.88;
-      g.fill();
-      g.globalAlpha = 1;
-      g.lineWidth = scelta && scelta.c === o.c ? 4 * dpr : 1.5 * dpr;
-      g.strokeStyle = scelta && scelta.c === o.c ? '#fff' : '#000';
-      g.stroke();
-      const tot = Object.values(o.u || {}).reduce((a, b) => a + b, 0);
-      if (tot > 0 && !o.fu && !o.fi) {
-        g.fillStyle = '#201000';
-        g.font = `700 ${Math.round(r * 1.1)}px Barlow, sans-serif`;
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        g.fillText('-' + tot, px(o.x), py(o.y) + 1);
-      }
-    }
-    // le altre auto e la mia
-    for (const a of stato.auto) {
-      const c = stato.caselle?.[a.c];
-      if (!c) continue;
-      g.beginPath();
-      g.rect(px(c[0]) - r * 0.8, py(c[1]) - r * 0.8, r * 1.6, r * 1.6);
-      g.fillStyle = colore(a.p);
-      g.fill();
-      g.lineWidth = (a === io ? 4 : 2) * dpr;
-      g.strokeStyle = a === io ? '#fff' : '#000';
-      g.stroke();
+  g.fillStyle = '#20242c';
+  g.fillRect(0, 0, cv.width, cv.height);
+  if (im.complete && im.naturalWidth) {
+    // solo la parte del riquadro che sta dentro l'immagine
+    const ax = Math.max(0, x0), ay = Math.max(0, y0), bx = Math.min(iw, x0 + w), by = Math.min(ih, y0 + hh);
+    if (bx > ax && by > ay) {
+      const s = im.naturalWidth / iw;
+      g.drawImage(im, ax * s, ay * s, (bx - ax) * s, (by - ay) * s, px(ax), py(ay), (bx - ax) * k, (by - ay) * k);
     }
   }
-  if (scelta) scelta = att.opz.find((o) => o.c === scelta.c) || null;
-  function mostraScelta() {
-    if (!scelta) return;
-    det.textContent = testoOpz(stato.regole, scelta);
-    det.className = 'dettaglio' + (scelta.fu || scelta.te ? ' male' : '');
-    ok.disabled = false;
-    ok.className = scelta.fu || scelta.te ? '' : 'verde';
+  for (const o of opz) {
+    const sel = scelta && scelta.c === o.c;
+    g.beginPath();
+    g.arc(px(o.x), py(o.y), sel ? r * 1.45 : r, 0, 6.2832);
+    g.fillStyle = coloreOpz(o);
+    g.globalAlpha = 0.88;
+    g.fill();
+    g.globalAlpha = 1;
+    g.lineWidth = sel ? 4 * dpr : 1.5 * dpr;
+    g.strokeStyle = sel ? '#fff' : '#000';
+    g.stroke();
+    const tot = Object.values(o.u || {}).reduce((a, b) => a + b, 0);
+    if (tot > 0 && !o.fu && !o.fi) {
+      g.fillStyle = '#201000';
+      g.font = `700 ${Math.round(r * 1.1)}px Barlow, sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText('-' + tot, px(o.x), py(o.y) + 1);
+    }
   }
-  mostraScelta();
-  dipingi();
+  // le auto: la mia con il bordo bianco
+  for (const a of stato.auto) {
+    const c = stato.caselle?.[a.c];
+    if (!c || a.f || a.pa > 0) continue;
+    g.beginPath();
+    g.rect(px(c[0]) - r * 0.8, py(c[1]) - r * 0.8, r * 1.6, r * 1.6);
+    g.fillStyle = colore(a.p);
+    g.fill();
+    g.lineWidth = (a === mia ? 4 : 2) * dpr;
+    g.strokeStyle = a === mia ? '#fff' : '#000';
+    g.stroke();
+  }
   cv.onpointerdown = (ev) => {
+    if (!toccabili) return;
     const b = cv.getBoundingClientRect();
     const x = (ev.clientX - b.left) * (cv.width / b.width), y = (ev.clientY - b.top) * (cv.height / b.height);
     let best = null, bd = r * 2.2;
-    for (const o of att.opz) {
+    for (const o of opz) {
       const d = Math.hypot(px(o.x) - x, py(o.y) - y);
       if (d < bd) { bd = d; best = o; }
     }
     if (!best) return;
+    if (scelta && scelta.c === best.c) { manda({ t: 'mossa', c: best.c }); return; }
     scelta = best;
-    mostraScelta();
-    dipingi();
+    disegna();
   };
-  ok.onclick = () => { if (scelta) manda({ t: 'mossa', c: scelta.c }); };
 }
 
+let _rid = 0;
+window.addEventListener('resize', () => { clearTimeout(_rid); _rid = setTimeout(disegna, 120); });
+
 // per le prove automatiche
-window.FDprova = { stato: () => stato, uid: () => uid, manda, tocca: () => !!stato?.att && stato.att.uid === uid && inviata !== stato.n };
+window.FDprova = { stato: () => stato, uid: () => uid, manda,
+  // dove toccare sullo schermo per la marcia m
+  marcia: (m) => { const b = document.getElementById('plancia').getBoundingClientRect(); const [x, y] = puntoMarcia(m);
+    return { x: b.left + x / PLANCIA.larg * b.width, y: b.top + y / PLANCIA.alt * b.height }; },
+  scegli: (c) => { scelta = stato.att.opz.find((o) => o.c === c) || null; disegna(); }, tocca: () => !!stato?.att && stato.att.uid === uid && inviata !== stato.n };
 
 ingresso();
 if (codice.length === 4 && nome && q.has('subito')) entra();

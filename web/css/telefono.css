@@ -25,24 +25,61 @@ button.grigio { background: #2a303c; }
 button:disabled { background: #2a303c; color: #7b8493; }
 .errore { color: #ff7a6b; text-align: center; min-height: 24px; font-weight: 500; }
 .testa { display: flex; gap: 12px; align-items: center; min-width: 0; }
-.testa img { width: 62px; height: 88px; object-fit: cover; border-radius: 8px; border: 3px solid #fff; flex: 0 0 auto; }
+.testa .col { width: 16px; height: 56px; border-radius: 5px; border: 1px solid #000; flex: 0 0 auto; }
 .testa .chi { flex: 1 1 auto; min-width: 0; }
 .testa .nome { font-size: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .testa .dati { color: #9ea7b6; font-weight: 500; font-size: 18px; }
-.zone { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.zona { flex: 1 1 86px; min-width: 86px; border-radius: 8px; padding: 4px 8px; background: #0d1016; border-left: 8px solid #888;
-  display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; font-weight: 500; }
-.zona b { font-size: 24px; font-weight: 700; }
+/* ---- in gara: tutto in una schermata, senza scorrere */
+body.gara { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  height: 100dvh; min-height: 0; overflow: hidden; }
+body.gara #app { max-width: none; height: 100%; display: block; }
+.gioco { display: grid; height: 100%; gap: 6px; padding: 6px; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(140px, 1fr);
+  grid-template-areas: "ordine" "cruscotto" "pista"; }
+.ordine { grid-area: ordine; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.oc { display: inline-flex; align-items: center; gap: 4px; background: #171b24; border: 2px solid #2a303c; border-radius: 8px; padding: 1px 4px 1px 3px;
+  font-size: 16px; min-width: 0; }
+.oc i { width: 10px; height: 22px; border-radius: 3px; border: 1px solid #000; flex: 0 0 auto; }
+.oc .n { max-width: 84px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc b { min-width: 28px; text-align: center; border-radius: 5px; padding: 0 3px; font-size: 15px; }
+.oc.turno { background: #5a1014; border-color: #e11a1f; }
+.oc.io { border-color: #ffd21a; }
+.oc.via { opacity: .55; }
+.cruscotto { grid-area: cruscotto; display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: 0; background: #171b24;
+  border: 2px solid #2a303c; border-radius: 12px; padding: 6px; }
+.cruscotto.tocca { border-color: #ffd21a; box-shadow: 0 0 12px rgba(255, 210, 26, .45); }
+.cruscotto canvas { display: block; width: 100%; max-width: 46dvh; margin: 0 auto; border-radius: 8px; touch-action: manipulation; }
+.chi { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.chi .nome { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 60px; }
+.chi .dati { color: #9ea7b6; font-weight: 500; font-size: 15px; white-space: nowrap; }
+.zone { display: flex; gap: 3px; }
+.zona { flex: 1 1 0; min-width: 0; border-radius: 6px; padding: 0 2px; background: #0d1016; border-bottom: 4px solid #888; text-align: center;
+  font-size: 11px; font-weight: 500; line-height: 1.1; overflow: hidden; }
+.zona span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #9ea7b6; }
+.zona b { font-size: 19px; font-weight: 700; }
 .zona.poco b { color: #ff5a4d; }
-.marce { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.marcia { min-height: 96px; font-size: 30px; line-height: 1.05; padding: 6px; }
-.marcia small { display: block; font-size: 17px; font-weight: 500; }
-.mappa { position: relative; width: 100%; border-radius: 10px; overflow: hidden; background: #000; touch-action: none; }
-.mappa canvas { display: block; width: 100%; }
-.dettaglio { min-height: 52px; color: #ffd21a; font-size: 20px; }
+.azione { min-width: 0; }
+.azione h2 { font-size: 21px; }
+.azione h2 small { font-family: 'Barlow', sans-serif; font-weight: 500; font-size: 15px; color: #c9d0db; }
+.azione .sotto { text-align: left; font-size: 15px; line-height: 1.15; }
+.azione button { min-height: 44px; font-size: 22px; padding: 6px 10px; margin-top: 4px; }
+.azione .grande { font-size: 26px; margin: 2px 0; }
+.azione .dado { font-size: 24px; min-width: 40px; padding: 0 6px; }
+.esiti { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0; }
+.esiti span { flex: 1 1 34px; min-width: 34px; max-width: 64px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 500; line-height: 1.05;
+  padding: 1px 0 2px 0; border: 1px solid #000; }
+.esiti b { display: block; font-size: 18px; font-weight: 700; }
+.pista { grid-area: pista; position: relative; min-width: 0; min-height: 0; border-radius: 10px; overflow: hidden; background: #000; }
+.pista canvas { display: block; touch-action: none; }
+.dettaglio { min-height: 34px; color: #ffd21a; font-size: 16px; line-height: 1.15; }
 .dettaglio.male { color: #ff7a6b; }
-.legenda { display: flex; flex-wrap: wrap; gap: 4px 12px; color: #9ea7b6; font-weight: 500; font-size: 15px; }
-.legenda i { display: inline-block; width: 14px; height: 14px; border-radius: 7px; margin-right: 4px; vertical-align: -2px; }
+@media (orientation: landscape) {
+  .gioco { grid-template-columns: minmax(230px, 40%) minmax(0, 1fr) 132px; grid-template-rows: minmax(0, 1fr); grid-template-areas: "cruscotto pista ordine"; }
+  .ordine { flex-direction: column; flex-wrap: nowrap; overflow: hidden; }
+  .oc { justify-content: space-between; }
+  .oc .n { flex: 1 1 auto; max-width: none; }
+  .cruscotto { overflow: hidden; }
+  .cruscotto canvas { max-width: 62dvh; }
+}
 .riga { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; font-size: 19px; min-width: 0; }
 .riga.turno { background: #5a1014; }
 .riga.io { outline: 2px solid #ffd21a; }

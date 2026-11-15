@@ -41,6 +41,9 @@ var _prec_due: Array = []
 ## Detto dall'interfaccia: vero se il punto è sopra un pannello (il tocco non deve arrivare al tabellone).
 var sopra_ui: Callable
 
+## false: la telecamera resta dove l'ha messa il giocatore e non insegue le mosse
+var segui := true
+
 func _ready() -> void:
 	font = load("res://assets/font/BarlowCondensed-Bold.ttf")
 	var env := WorldEnvironment.new()
@@ -117,8 +120,8 @@ func vista_generale(subito := false) -> void:
 		inclinazione = 1.05
 
 ## Inquadra un gruppo di caselle (l'auto che muove e dove può arrivare).
-func inquadra(caselle: Array, margine := 2.2) -> void:
-	if caselle.is_empty():
+func inquadra(caselle: Array, margine := 2.2, comunque := false) -> void:
+	if caselle.is_empty() or (not segui and not comunque):
 		return
 	var lo := Vector3(INF, 0, INF)
 	var hi := Vector3(-INF, 0, -INF)
