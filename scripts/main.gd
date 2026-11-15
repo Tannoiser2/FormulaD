@@ -338,9 +338,12 @@ func _allinea(vista: Dictionary) -> void:
 func _salva() -> void:
 	if motore == null or auto_prova:
 		return
-	var testo := var_to_str({"s": motore.s, "livello": livello, "stanza": modo == "stanza"})
+	var testo := var_to_str({"s": motore.s, "livello": livello, "stanza": modo == "stanza", "codice": rete.codice, "seq": _seq})
 	rete.salva("fd_gara", testo)
-	rete.salva_remoto(testo)
+	if modo == "stanza":
+		rete.salva_stanza(testo)
+	else:
+		rete.salva_remoto(testo)
 
 func _riprendi() -> void:
 	var d = str_to_var(rete.carica("fd_gara"))
@@ -359,9 +362,10 @@ func _riprendi() -> void:
 	modo = "stanza" if d.get("stanza", false) else "locale"
 	_apri_gara()
 	if modo == "stanza":
-		# i piloti da telefono rientrano con il nuovo codice
+		# si riapre la stessa stanza (stesso codice e QR): i piloti da telefono rientrano da soli
+		_seq = int(d.get("seq", 0)) + 1
 		_stanza_chiesta = true
-		rete.avvia()
+		rete.avvia(str(d.get("codice", "")))
 	hud.cronaca("Gara ripresa dal turno %d" % motore.s.turno, "ordine")
 	_ciclo()
 
@@ -474,6 +478,8 @@ func _evento_rete(e: Dictionary) -> void:
 					_al_menu()
 				elif not menu.stanza:
 					menu.principale()
+				else:
+					menu.preparazione()
 
 # ------------------------------------------------------------------ rete: ospite
 

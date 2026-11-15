@@ -13,9 +13,15 @@ let stacca = [];
 function base() {
   return location.href.split('?')[0].split('#')[0].replace(/index\.html$/, '');
 }
-async function pronta() {
-  if (!rete) { const r = creaRete(); await r.init(); rete = r; }
-  return rete;
+// Una sola accensione della rete, anche se la chiedono in due nello stesso momento
+// (due accessi anonimi insieme creerebbero due identità diverse).
+let accensione = null;
+function pronta() {
+  if (!accensione) {
+    accensione = (async () => { const r = creaRete(); await r.init(); rete = r; return r; })();
+    accensione.catch(() => { accensione = null; });
+  }
+  return accensione;
 }
 function staccaTutto() {
   for (const f of stacca) { try { f(); } catch (e) { /* ok */ } }
@@ -93,6 +99,8 @@ window.FR = {
     codice = '';
   },
   stato(j) { if (rete && codice && !ospite) rete.set(`${RADICE}/${codice}/game`, spezza(j)).catch((e) => console.warn(e)); },
+  // copia del salvataggio dentro la stanza (solo chi ospita la può scrivere)
+  salvaStanza(v) { if (rete && codice && !ospite) rete.set(`${RADICE}/${codice}/labels`, v ? spezza(v) : null).catch((e) => console.warn(e)); },
   azione(k, p) { if (rete && codice) rete.push(`${RADICE}/${codice}/acts`, { s: rete.uid, k, v: p }).catch?.((e) => console.warn(e)); },
   suono(n) { suona(n); },
   schermoIntero() {

@@ -194,7 +194,7 @@ func preparazione() -> void:
 		var vq := UI.colonna(2)
 		hq.add_child(vq)
 		if codice == "":
-			vq.add_child(UI.testo("Apro la stanza...", 28, UI.GIALLO))
+			vq.add_child(UI.testo("Apro la stanza..." if avviso == "" else avviso, 28, UI.GIALLO, false, 480))
 		else:
 			vq.add_child(UI.testo("CODICE STANZA", 22, UI.GRIGIO))
 			vq.add_child(UI.testo(codice, 80, UI.GIALLO, true))

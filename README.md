@@ -15,7 +15,7 @@ Si gioca qui: **https://tannoiser2.github.io/FormulaD/**
 - **Online e telefoni**: chi apre una stanza mostra il tabellone (TV, monitor, iPad); gli altri entrano con il gioco
   completo da un altro schermo oppure **dal telefono**, inquadrando il QR code, e da lì scelgono marcia e casella.
 - **Tutto in italiano**, comprese le regole in breve dentro il gioco.
-- **Gara salvata a ogni turno**, sul dispositivo e su Firebase: dal menu, *Riprendi la gara salvata*.
+- **Gara salvata a ogni turno** (sul dispositivo e, per le stanze, anche su Firebase): dal menu, *Riprendi la gara salvata*.
 
 ## Come si gioca
 
@@ -68,10 +68,14 @@ d'arrivo è quello di gioco (prima chi era davanti).
   e il suo nome in `Dati.PISTE`.
 - `web/` - la pagina del gioco (`shell.html`), il ponte `js/ponte.js`, la pagina dei telefoni (`telefono.html`,
   `js/telefono.js`, `css/telefono.css`), `js/rete.js` (Firebase o rete locale per le prove), `js/suoni.js`.
-- **Firebase**: progetto condiviso della ludoteca, radice `formulad`. Usa la **regola comune** `$game` della ludoteca
-  (`firebase/database.rules.json` nel repository della ludoteca): stanza in `formulad/rooms/<CODICE>` con `host`,
-  `seats/<uid>` (i giocatori), `game` (lo stato della gara, a pezzi) e `acts` (le mosse); salvataggi in
-  `formulad/salvataggi/<uid>`. Non serve aggiungere nulla nella console.
+- **Firebase**: progetto condiviso della ludoteca, radice `formulad`. Usa la **regola comune** `$game` della ludoteca,
+  senza aggiungere nulla nella console: stanza in `formulad/rooms/<CODICE>` con `host`, `status`, `seats/<uid>`
+  (i giocatori), `game` (lo stato della gara, a pezzi di 15000 caratteri), `acts` (le mosse, ognuna con il numero
+  dello stato a cui risponde) e `labels` (la copia del salvataggio della gara, scritta solo da chi ospita).
+  Riprendendo una gara con i telefoni si riapre la stessa stanza, con lo stesso codice.
+  Le gare su un solo schermo si salvano sul dispositivo; il gioco prova anche a copiarle in
+  `formulad/salvataggi/<uid>`, che funziona quando nella console è pubblicata la parte `salvataggi` della regola
+  comune (oggi il database la rifiuta, e il gioco prosegue senza errori).
 - Prove:
   - `godot --headless --path . -s tests/sim.gd -- 22` - gare automatiche su tutti i circuiti, controlla le regole e
     il salvataggio;

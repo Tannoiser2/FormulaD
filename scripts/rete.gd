@@ -100,6 +100,11 @@ func salva_remoto(v: String) -> void:
 	if fr:
 		fr.salvaRemoto(v)
 
+## Copia del salvataggio dentro la stanza aperta.
+func salva_stanza(v: String) -> void:
+	if fr:
+		fr.salvaStanza(v)
+
 func chiedi_remoto() -> void:
 	if fr:
 		fr.caricaRemoto()
