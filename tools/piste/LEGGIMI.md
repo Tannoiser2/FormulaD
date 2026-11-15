@@ -54,3 +54,13 @@ Le caselle delle curve non si correggono più: si rifanno a mano leggendo il tab
 5. `installa.py` porta nel gioco circuito, tabellone, miniatura e immagine per i telefoni.
 
 In ogni cartella (`it`, `ho`, `ze`) ci sono le caselle rilevate, `mano.json`, `base.json` e la descrizione finale.
+
+## Suzuka e Nürburgring
+
+- Suzuka ha un incrocio (ponte e galleria): il rilevatore non chiude l'anello. I tratti senza curve si trovano con
+  `celle.py` (macchie di asfalto lungo una mezzeria disegnata a mano), in `corsie.py` l'ordine si forza con `a>b`
+  dove la corsia passa sotto il ponte, e in `base.json` `vieta` elenca i due gruppi di caselle che si sfiorano senza
+  toccarsi.
+- `forza.py` prova tutte le combinazioni dei lati delle frecce della corsia centrale di una curva lunga;
+  `percorsi.py` stampa il percorso più lungo e più corto; `tutto.py` disegna il circuito montato sopra il tabellone.
+- `collega` / `scollega` in `base.json` correggono il bersaglio di una singola freccia (Veedol-S).

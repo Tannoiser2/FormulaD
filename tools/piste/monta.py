@@ -30,10 +30,12 @@ for c in sp['curve']:
             if k == kb: break
             k = (k + 1) % len(ch)
 # caselle a contatto nelle corsie accanto (stesso criterio delle piste del modulo: si sovrappongono lungo la corsia)
+VA, VB = [set(x) for x in sp.get('vieta', [[], []])]   # due gruppi di caselle che si sfiorano senza toccarsi (ponte e galleria)
 accanto = {i: [] for i in by}
 for a in by:
     for b in by:
         if abs(lane[a] - lane[b]) != 1: continue
+        if (a in VA and b in VB) or (a in VB and b in VA): continue
         v = pos[b] - pos[a]
         if abs(v[0]) > 110 or abs(v[1]) > 110: continue
         lu, la = rel(a, b)
@@ -69,7 +71,7 @@ for a in by:
             destra = max(lati, key=lambda q: lati[q]); sinistra = min(lati, key=lambda q: lati[q])
             l2 = destra if gira > 0 else sinistra
             scelte[a] = l2
-        cand = [(lu, b) for b, lu in accanto[a] if lane[b] == l2 and lu > 0.05 * tip]
+        cand = [(lu, b) for b, lu in accanto[a] if lane[b] == l2 and lu > sp.get('soglia_forca', 0.05) * tip]
         if not cand:
             cand = [(rel(a, b)[0], b) for b in by if lane[b] == l2 and 0 < rel(a, b)[0] < 2.2 * tip and abs(rel(a, b)[1]) < 1.9 * 0.62 * tip]
         if cand:

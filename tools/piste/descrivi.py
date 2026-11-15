@@ -18,7 +18,7 @@ sp = {'id': b['id'], 'nome': b['nome'], 'giri': b.get('giri', 2), 'img': b['img'
       'pit': {'corsia': P['corsia'], 'box': {str(P['primo_box'] + k): nomi[k] for k in range(10)}, 'lato': P['lato'], 'scarto': P.get('scarto', 11),
               'dopo_bandiera': P['dopo_bandiera'], 'ingresso': [vic(*P['ingresso'])], 'uscita': [vic(*P['uscita'])]},
       'curve': cv['curve'], 'forche': cv['forche']}
-for k in ('collega', 'scollega', 'forca_lontana'):
+for k in ('collega', 'scollega', 'forca_lontana', 'vieta', 'soglia_forca'):
     if k in b: sp[k] = b[k]
 sp['forche'].update({str(k): v for k, v in b.get('forche', {}).items()})
 json.dump(sp, open(sys.argv[4], 'w'), indent=1, ensure_ascii=False)

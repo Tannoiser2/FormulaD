@@ -2,7 +2,10 @@
 corsie.py <in.json> <out.json> <partenza corsia1> <partenza corsia2> <partenza corsia3> [lane=id,id ...]"""
 import sys, json, numpy as np
 d = json.load(open(sys.argv[1]))
-for a in sys.argv[6:]:
+forzati = {}
+for a in [x for x in sys.argv[6:] if '>' in x]:
+    u, w = a.split('>'); forzati[int(u)] = int(w)
+for a in [x for x in sys.argv[6:] if '=' in x]:
     l, ids = a.split('='); ids = {int(x) for x in ids.split(',')}
     for s in d['spaces']:
         if s['id'] in ids: s['lane'] = int(l)
@@ -15,6 +18,8 @@ for lane, coppia in zip((1, 2, 3), sys.argv[3:6]):
     dirp = np.array(by[secondo]['pos']) - np.array(by[st]['pos']); dirp = dirp / np.hypot(*dirp)
     while resto:
         p = np.array(by[ch[-1]]['pos']); best = None; bd = 1e9
+        if ch[-1] in forzati and forzati[ch[-1]] in resto:
+            best = forzati[ch[-1]]; v = np.array(by[best]['pos']) - p; dirp = v / np.hypot(*v); ch.append(best); resto.discard(best); continue
         for i in resto:
             v = np.array(by[i]['pos']) - p; dist = np.hypot(*v)
             if dist > 95: continue
