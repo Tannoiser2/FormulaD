@@ -37,3 +37,20 @@ di Spa sono in `spa/` (`g7.json` le caselle corrette, `spec.json` tutto quello c
 
 Su Spa tutte le 8 curve tornano con i numeri stampati. Resta un margine: dove più letture delle frecce danno gli
 stessi numeri (corsia centrale di alcune curve) è stata scelta la lettura che si vede sul tabellone ingrandito.
+
+## Dopo Spa: il modo svelto (Monza, Hockenheim, Zeltweg)
+
+Le caselle delle curve non si correggono più: si rifanno a mano leggendo il tabellone ingrandito.
+
+1. `rileva.py find_grid <id>` per i rettilinei (sui tabelloni con l'asfalto grigio serve `FD_ASFALTO=0,180,6,60`).
+2. `crudo.py` su ogni curva; per ogni corsia si scrivono in `mano.json` i centri delle caselle nel verso di marcia e,
+   dove c'è la doppia freccia, la corsia verso cui punta (2 dai bordi, 1 o 3 dal centro). La corsia 1 è sempre quella
+   a destra nel senso di marcia.
+3. `rifai.py` toglie le caselle rilevate dentro le curve e mette quelle lette; `corsie.py` le mette in fila e segnala i
+   buchi nei rettilinei, che si guardano con `punti.py` e si correggono in `mano.json` (`togli`, `sposta`, `aggiungi`).
+4. `base.json` (nome, traguardo, prime due caselle della griglia, corsia dei box) e `descrivi.py` fanno la descrizione;
+   `monta.py` costruisce il circuito e confronta ogni curva con i numeri L e C del cartello (`segni.py` li ritaglia).
+   Se una curva non torna, `varianti.py` dice quali letture alternative di una freccia la fanno tornare.
+5. `installa.py` porta nel gioco circuito, tabellone, miniatura e immagine per i telefoni.
+
+In ogni cartella (`it`, `ho`, `ze`) ci sono le caselle rilevate, `mano.json`, `base.json` e la descrizione finale.
