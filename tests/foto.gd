@@ -20,6 +20,8 @@ func _init() -> void:
 	await _foto(dir, "0_menu")
 	main.menu._voce("locale")
 	main.menu.regole = regole
+	if OS.get_environment("PISTA") != "":
+		main.menu.pista_n = Dati.PISTE.find(OS.get_environment("PISTA"))
 	main.menu.preparazione()
 	await create_timer(0.3).timeout
 	await _foto(dir, "1_prepara")

@@ -153,6 +153,11 @@ func preparazione() -> void:
 		preparazione())
 	hc.add_child(bp)
 	var ln := UI.testo(p.nome, 34, UI.CHIARO, true)
+	# i nomi lunghi si rimpiccioliscono invece di essere tagliati
+	var dim_nome := 34
+	while dim_nome > 16 and UI.f_titolo.get_string_size(p.nome, HORIZONTAL_ALIGNMENT_LEFT, -1, dim_nome).x > 400.0:
+		dim_nome -= 2
+	ln.add_theme_font_size_override("font_size", dim_nome)
 	ln.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ln.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ln.clip_text = true
