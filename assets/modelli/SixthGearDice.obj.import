@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dqp7by3rcyg68"
+path="res://.godot/imported/SixthGearDice.obj-3faa22e4c37db6da62dd2235a47e683e.mesh"
+
+[deps]
+
+files=["res://.godot/imported/SixthGearDice.obj-3faa22e4c37db6da62dd2235a47e683e.mesh"]
+
+source_file="res://assets/modelli/SixthGearDice.obj"
+dest_files=["res://.godot/imported/SixthGearDice.obj-3faa22e4c37db6da62dd2235a47e683e.mesh", "res://.godot/imported/SixthGearDice.obj-3faa22e4c37db6da62dd2235a47e683e.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dsxhrodo8tv4n"
+path="res://.godot/imported/GearStick.obj-abce3a92775334d13b655de4a2aecbcd.mesh"
+
+[deps]
+
+files=["res://.godot/imported/GearStick.obj-abce3a92775334d13b655de4a2aecbcd.mesh"]
+
+source_file="res://assets/modelli/GearStick.obj"
+dest_files=["res://.godot/imported/GearStick.obj-abce3a92775334d13b655de4a2aecbcd.mesh", "res://.godot/imported/GearStick.obj-abce3a92775334d13b655de4a2aecbcd.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

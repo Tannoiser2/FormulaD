@@ -1,0 +1,59 @@
+@font-face { font-family: 'Racing'; src: url('../font/RacingSansOne-Regular.ttf'); }
+@font-face { font-family: 'Barlow'; src: url('../font/BarlowCondensed-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: 'Barlow'; src: url('../font/BarlowCondensed-Medium.ttf'); font-weight: 500; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; background: #0d1016; color: #eef1f6; font-family: 'Barlow', sans-serif; font-weight: 700;
+  font-size: 19px; overscroll-behavior: none; }
+body { min-height: 100vh; padding: env(safe-area-inset-top) 10px calc(12px + env(safe-area-inset-bottom)) 10px; }
+#app { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; min-width: 280px; }
+h1 { font-family: 'Racing', sans-serif; font-weight: 400; color: #e11a1f; font-size: 46px; margin: 14px 0 0 0; text-align: center;
+  text-shadow: 0 0 2px #fff; letter-spacing: 1px; }
+h2 { font-family: 'Racing', sans-serif; font-weight: 400; font-size: 26px; margin: 0; color: #ffd21a; }
+.sotto { text-align: center; color: #9ea7b6; font-weight: 500; margin: 0; }
+.box { background: #171b24; border: 2px solid #2a303c; border-radius: 14px; padding: 12px; min-width: 0; }
+.box.mio { border-color: #e11a1f; }
+.box.tocca { border-color: #ffd21a; box-shadow: 0 0 14px rgba(255, 210, 26, .45); }
+label { display: block; color: #9ea7b6; font-weight: 500; margin-bottom: 4px; }
+input { width: 100%; font: inherit; font-size: 28px; padding: 10px 12px; border-radius: 10px; border: 2px solid #3a4252; background: #0d1016;
+  color: #fff; text-transform: none; }
+input.codice { text-transform: uppercase; letter-spacing: 8px; text-align: center; font-family: 'Racing', sans-serif; font-size: 40px; }
+button { font: inherit; color: #fff; border: 2px solid rgba(255, 255, 255, .35); border-radius: 12px; padding: 12px 14px; background: #e11a1f;
+  width: 100%; font-size: 26px; cursor: pointer; min-height: 56px; }
+button:active { transform: scale(.98); filter: brightness(.85); }
+button.verde { background: #19802f; }
+button.grigio { background: #2a303c; }
+button:disabled { background: #2a303c; color: #7b8493; }
+.errore { color: #ff7a6b; text-align: center; min-height: 24px; font-weight: 500; }
+.testa { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.testa img { width: 62px; height: 88px; object-fit: cover; border-radius: 8px; border: 3px solid #fff; flex: 0 0 auto; }
+.testa .chi { flex: 1 1 auto; min-width: 0; }
+.testa .nome { font-size: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.testa .dati { color: #9ea7b6; font-weight: 500; font-size: 18px; }
+.zone { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.zona { flex: 1 1 86px; min-width: 86px; border-radius: 8px; padding: 4px 8px; background: #0d1016; border-left: 8px solid #888;
+  display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; font-weight: 500; }
+.zona b { font-size: 24px; font-weight: 700; }
+.zona.poco b { color: #ff5a4d; }
+.marce { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.marcia { min-height: 96px; font-size: 30px; line-height: 1.05; padding: 6px; }
+.marcia small { display: block; font-size: 17px; font-weight: 500; }
+.mappa { position: relative; width: 100%; border-radius: 10px; overflow: hidden; background: #000; touch-action: none; }
+.mappa canvas { display: block; width: 100%; }
+.dettaglio { min-height: 52px; color: #ffd21a; font-size: 20px; }
+.dettaglio.male { color: #ff7a6b; }
+.legenda { display: flex; flex-wrap: wrap; gap: 4px 12px; color: #9ea7b6; font-weight: 500; font-size: 15px; }
+.legenda i { display: inline-block; width: 14px; height: 14px; border-radius: 7px; margin-right: 4px; vertical-align: -2px; }
+.riga { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; font-size: 19px; min-width: 0; }
+.riga.turno { background: #5a1014; }
+.riga.io { outline: 2px solid #ffd21a; }
+.riga .col { width: 12px; height: 26px; border-radius: 4px; flex: 0 0 auto; border: 1px solid #000; }
+.riga .n { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riga .m { flex: 0 0 auto; min-width: 34px; text-align: center; border-radius: 6px; padding: 0 4px; color: #fff; }
+.riga .p { flex: 0 0 auto; color: #9ea7b6; font-weight: 500; font-size: 16px; }
+.log { color: #c9d0db; font-weight: 500; font-size: 16px; line-height: 1.25; }
+.log div { padding: 2px 0; border-bottom: 1px solid #222834; }
+.grande { font-family: 'Racing', sans-serif; font-weight: 400; font-size: 34px; text-align: center; margin: 4px 0; }
+.dado { display: inline-block; min-width: 54px; text-align: center; border-radius: 10px; padding: 2px 8px; font-family: 'Racing', sans-serif;
+  font-weight: 400; font-size: 34px; border: 2px solid #fff; }
+.lampo { animation: lampo .5s 3; }
+@keyframes lampo { 50% { background: #5c4a00; } }
