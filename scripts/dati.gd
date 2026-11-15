@@ -68,7 +68,7 @@ const PILOTI := [
 	{"id": "litsu", "nome": "Li Tsu Sin", "scuderia": "bianca", "posto": "Brown", "variante": 1},
 ]
 
-const PISTE := ["FDMonaco", "FDHockenheim", "FDSebring", "FDValencia", "FDSingapore", "FDAustin", "FDBuddh", "FDSotchi", "FDe01", "FDe02", "FDe03", "FDe04", "FDe08a", "FDe15", "FDe16", "FDe19", "FDe22a"]
+const PISTE := ["FDMonaco", "FDHockenheim", "FDSebring", "FDValencia", "FDSingapore", "FDAustin", "FDBuddh", "FDSotchi", "FDe01", "FDe02", "FDe03", "FDe04", "FDe06", "FDe08a", "FDe10", "FDe12", "FDe15", "FDe16", "FDe19", "FDe22a"]
 
 static func zone(regole: String) -> Array:
 	return ZONE[regole]

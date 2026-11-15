@@ -5,10 +5,23 @@ celle.py <img> <uscita.json> <anteprima.jpg> "x,y x,y x,y ..." ["x,y ..." altre 
 import sys, json, cv2, numpy as np
 im = cv2.imread(sys.argv[1]); hsv = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
 S, V = hsv[..., 1].astype(int), hsv[..., 2].astype(int)
-dentro = ((S < 62) & (V > 150) & (V < 216)).astype(np.uint8)
+import os
+Hh = hsv[..., 0].astype(int)
+if os.environ.get('FD_CELLE') == 'colore':
+    # asfalto colorato o chiaro: tutto quello che non e' riga scura, bordo bianco, erba o sabbia
+    verde = (Hh > 22) & (Hh < 92) & (S > 45)
+    bianco = (S < 12) & (V > 228)
+    rosso = ((Hh < 12) | (Hh > 168)) & (S > 120)
+    Vf = hsv[..., 2].astype(np.float32); righe = Vf < cv2.blur(Vf, (15, 15)) - float(os.environ.get('FD_RIGA', '9'))
+    dentro = ((V > 140) & (S < 125) & ~verde & ~bianco & ~rosso & ~righe).astype(np.uint8)
+else:
+    dentro = ((S < 62) & (V > 150) & (V < 216)).astype(np.uint8)
 dentro = cv2.erode(dentro, np.ones((3, 3), np.uint8))
 # la strada intera (asfalto e righe scure, senza i bordi bianchi): serve la distanza dal bordo per sapere la corsia
-strada = ((S < 70) & (V > 60) & (V < 216)).astype(np.uint8)
+if os.environ.get('FD_CELLE') == 'colore':
+    strada = (((V > 140) & (S < 125) & ~verde & ~bianco & ~rosso) | ((V <= 140) & (S < 140) & ~verde)).astype(np.uint8)
+else:
+    strada = ((S < 70) & (V > 60) & (V < 216)).astype(np.uint8)
 strada = cv2.morphologyEx(strada, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 dist, vicino = cv2.distanceTransformWithLabels(strada, cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
 zy, zx = np.nonzero(strada == 0); etich = vicino[zy, zx]; dove = {int(e): (int(x), int(y)) for e, x, y in zip(etich, zx, zy)}

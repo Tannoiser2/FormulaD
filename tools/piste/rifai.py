@@ -26,7 +26,7 @@ for c in m['curve']:
         for k, p in enumerate(c[l]):
             i = 1000 * c['id'] + 100 * int(l) + k + 1
             nuove.append(nuova(i, p[0], p[1], int(l))); ids.append(i)
-            if len(p) > 2 and p[2]: forche[str(i)] = p[2]
+            if len(p) > 2 and p[2]: forche[str(i)] = 0 if p[2] == 9 else p[2]   # 9 = corsia centrale, lato scelto dal programma
         voce[l] = [ids[0], ids[-1]]
     curve.append(voce)
 d['spaces'] = [s for s in d['spaces'] if str(s['id']) not in via] + nuove
