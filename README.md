@@ -13,7 +13,7 @@ Si gioca qui: **https://tannoiser2.github.io/FormulaD/**
   perché non insegua ogni mossa.
 - **Telefono**: plancia originale con le marce da toccare, punti dell'auto, il pezzo di pista che interessa e l'ordine di
   gioco; in verticale uno sotto l'altro, in orizzontale plancia a sinistra, pista al centro, ordine a destra.
-- **17 circuiti**: Monaco, Hockenheim, Sebring, Valencia, Singapore, Austin, Buddh, Sochi e nove tracciati Formula Dé (Monaco, Zandvoort e variante, Spa-Francorchamps, Monza, Hockenheim, Zeltweg, Suzuka, Nürburgring)
+- **22 circuiti**: Monaco, Hockenheim, Sebring, Valencia, Singapore, Austin, Buddh, Sochi e quattordici tracciati Formula Dé (Monaco, Zandvoort e variante, Spa-Francorchamps, Imola, Monza, Interlagos, Silverstone, Montreal, Hockenheim, Zeltweg, Barcellona, Suzuka, Nürburgring)
   (Monaco, Zandvoort e la sua variante). Ognuno ha la rete completa di caselle, corsie, frecce delle curve, griglia e box.
 - **Regole base e avanzate**, da 1 a 3 giri, fino a 10 auto.
 - **Piloti guidati dal computer** (prudente, normale, esperto) per giocare da soli.

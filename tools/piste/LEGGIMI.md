@@ -64,3 +64,13 @@ In ogni cartella (`it`, `ho`, `ze`) ci sono le caselle rilevate, `mano.json`, `b
 - `forza.py` prova tutte le combinazioni dei lati delle frecce della corsia centrale di una curva lunga;
   `percorsi.py` stampa il percorso più lungo e più corto; `tutto.py` disegna il circuito montato sopra il tabellone.
 - `collega` / `scollega` in `base.json` correggono il bersaglio di una singola freccia (Veedol-S).
+
+## Imola, Interlagos, Silverstone, Montreal, Barcellona
+
+- Dove l'asfalto si confonde con il resto del tabellone (Silverstone, Montreal) `corridoio.py` tiene solo una fascia
+  attorno a una mezzeria disegnata a mano; dove le righe arancioni delle curve spezzano la strada (Interlagos)
+  `ripulisci.py` le ridipinge.
+- `fila.py` trova le caselle dei rettilinei dalle righe trasversali quando il rilevatore non ce la fa;
+  `riempi.py` chiude i buchi di una o due caselle (le aggiunte dentro le curve vanno controllate e tolte a mano).
+- Montreal e Barcellona: dove le caselle rilevate erano buone le curve sono descritte con gli id delle caselle
+  (`curve.json`), senza riscriverle; `forza2.py` prova tutte le combinazioni di frecce di una curva.
