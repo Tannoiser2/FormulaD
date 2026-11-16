@@ -32,6 +32,10 @@ func _init():
 				await create_timer(0.5).timeout
 				root.get_viewport().get_texture().get_image().save_png(dir + "/strada.png")
 				print("foto strada")
+				main._comando("scritte")
+				await create_timer(0.5).timeout
+				root.get_viewport().get_texture().get_image().save_png(dir + "/strada_parole.png")
+				main._comando("scritte")
 				quit()
 				return
 		fatte += 1

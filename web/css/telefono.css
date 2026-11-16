@@ -111,3 +111,4 @@ body.gara #app { max-width: none; height: 100%; display: block; }
   .gioco.prep { grid-template-columns: minmax(0, 1fr) 132px; grid-template-rows: minmax(0, 1fr); grid-template-areas: "cruscotto ordine"; }
   .gioco.prep .assetto { grid-template-columns: repeat(2, minmax(96px, 1fr) 44px 34px 44px); column-gap: 10px; }
 }
+.azione button.piccolo { min-height: 34px; font-size: 15px; background: #2b3242; margin-top: 6px; padding: 4px 10px; width: auto; }

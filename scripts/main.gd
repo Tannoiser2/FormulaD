@@ -52,6 +52,8 @@ func _ready() -> void:
 	mondo.carica_pista(Pista.carica("FDMonaco"))
 	menu.ha_salvataggio = rete.carica("fd_gara") != ""
 	mondo.segui = rete.carica("fd_segui") != "0"
+	mondo.scritte_icone = rete.carica("fd_scritte") != "parole"
+	hud.scritte_icone = func() -> bool: return mondo.scritte_icone
 	hud.segna_segui(mondo.segui)
 	menu.principale()
 	if rete.web and not menu.ha_salvataggio:
@@ -117,6 +119,10 @@ func _comando(cosa: String) -> void:
 				_solo_velo()
 		"vista":
 			mondo.vista_generale()
+		"scritte":
+			mondo.cambia_scritte()
+			rete.salva("fd_scritte", "icone" if mondo.scritte_icone else "parole")
+			hud.chiedi()
 		"mappa":
 			var acceso: bool = mondo.mappa == null
 			mondo.mostra_mappa(acceso)

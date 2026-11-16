@@ -4,6 +4,18 @@ extends RefCounted
 ## la casella migliore (strada fatta, punti persi, rischi) guardando anche la curva che viene dopo.
 
 static var rng := RandomNumberGenerator.new()
+## Parametri di gioco (per provare varianti l'una contro l'altra in tests/duello.gd).
+static var prof: Dictionary = {}
+static var _scala_danni := 1.0   # quanto pesano i punti persi: meno verso la fine della gara
+
+static func _q(k: String, d: float) -> float:
+	return float(prof.get(k, d))
+
+## Quanta gara resta all'auto (1 al via, 0 al traguardo).
+static func resta(m: Motore, a: Dictionary) -> float:
+	var L: float = max(1.0, m.pista.lunghezza)
+	var fatto: float = max(0, int(a.giro) - 1) * L + (float(m.pista.lungo.get(a.c, 0.0)) if int(a.giro) >= 1 else 0.0)
+	return clamp(1.0 - fatto / (L * max(1, int(m.s.giri))), 0.0, 1.0)
 
 ## livello: 0 prudente e impreciso, 1 normale, 2 esperto
 static func decidi(m: Motore, livello := 1) -> Dictionary:
@@ -12,6 +24,8 @@ static func decidi(m: Motore, livello := 1) -> Dictionary:
 		return {}
 	var a: Dictionary = m.s.auto[att.auto]
 	var rumore: float = [3.0, 0.8, 0.0][clamp(livello, 0, 2)]
+	var f0 := _q("fine", 0.0)
+	_scala_danni = _q("danno", 1.0) * (f0 + (1.0 - f0) * resta(m, a))
 	if att.tipo == "assetto":
 		return m.assetto_ia(a, att.get("box", false))
 	if att.tipo == "mossa":
@@ -44,7 +58,8 @@ static func decidi(m: Motore, livello := 1) -> Dictionary:
 			peggio = min(peggio, p)
 		var atteso: float = tot / max(1, n)
 		# un po' di prudenza: conta anche il caso peggiore
-		var voto: float = atteso * 0.8 + peggio * 0.2 - costo + rng.randf_range(-rumore, rumore)
+		var pr := _q("prud", 0.05)
+		var voto: float = atteso * (1.0 - pr) + peggio * pr - costo + rng.randf_range(-rumore, rumore)
 		if voto > best:
 			best = voto
 			best_m = opz.m
@@ -63,6 +78,9 @@ static func _migliore(m: Motore, a: Dictionary, opzioni: Dictionary, marcia: int
 	return [best_c, best]
 
 static func _peso(m: Motore, zona: String, resta: int) -> float:
+	return _peso0(m, zona, resta) * _scala_danni
+
+static func _peso0(m: Motore, zona: String, resta: int) -> float:
 	match zona:
 		"ps":
 			return 1.3 + 10.0 / max(1, resta)
@@ -116,7 +134,7 @@ static func valuta(m: Motore, a: Dictionary, o: Dictionary, marcia: int, pf: Dic
 		if not da.pit:
 			p += 10.0 if serve else -30.0
 		return p + 3.0
-	p += 0.6 * _prospettiva(m, o.casella, marcia, o.fermate, dopo, e.testa)
+	p += _q("prosp", 0.6) * _prospettiva(m, o.casella, marcia, o.fermate, dopo, e.testa)
 	return p
 
 ## Quanto promette il turno dopo, partendo da lì con quella marcia.

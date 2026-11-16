@@ -27,6 +27,16 @@ let uid = '';
 let codice = (q.get('s') || '').toUpperCase().slice(0, 4);
 let nome = '';
 try { nome = localStorage.getItem('fd_nome') || ''; } catch (e) { /* ok */ }
+// sulle caselle: icone delle zone con il numero, oppure le parole
+let icone = true;
+try { icone = localStorage.getItem('fd_scritte') !== 'parole'; } catch (e) { /* ok */ }
+const ICONE = {};
+for (const k of ['gomme', 'freni', 'cambio', 'carrozzeria', 'motore', 'tenuta', 'ps']) {
+  const im = new Image();
+  im.onload = () => disegna();
+  im.src = `img/zone/${k}.png`;
+  ICONE[k] = im;
+}
 let stato = null;
 let scelta = null;       // opzione di mossa toccata
 let inviata = -1;        // numero dello stato a cui ho già risposto
@@ -206,7 +216,8 @@ function disegna() {
   } else if (tocca && att.tipo === 'mossa') {
     az = `<h2>Tiro <span class="dado" style="background:${COL_MARCE[mia.m]};color:${mia.m === 1 ? '#111' : '#fff'}">${att.tiro}</span> in ${MARCE[mia.m]}</h2>
       <div id="det" class="dettaglio ${scelta && (scelta.fu || scelta.te) ? 'male' : ''}">${scelta ? esc(testoOpz(stato.regole, scelta)) : 'Tocca una casella colorata sulla pista.'}</div>
-      <button id="ok" class="${scelta && (scelta.fu || scelta.te) ? '' : 'verde'}" ${scelta ? '' : 'disabled'}>CONFERMA</button>`;
+      <button id="ok" class="${scelta && (scelta.fu || scelta.te) ? '' : 'verde'}" ${scelta ? '' : 'disabled'}>CONFERMA</button>
+      <button id="scritte" class="piccolo">Sulle caselle: ${icone ? 'parole' : 'icone'}</button>`;
   } else if (att) {
     const a = stato.auto[att.auto];
     az = `<p class="grande" style="color:${colore(a.p)}">${att.uid === uid ? 'Mossa inviata...' : 'Tocca a ' + esc(a.n)}</p>`;
@@ -236,6 +247,8 @@ function disegna() {
     <div class="pista"><canvas id="mappa"></canvas></div></div>`;
   app.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { assPf[b.dataset.z] += Number(b.dataset.d); disegna(); }; });
   app.querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => { assG = b.dataset.g; disegna(); }; });
+  const bsc = document.getElementById('scritte');
+  if (bsc) bsc.onclick = () => { icone = !icone; try { localStorage.setItem('fd_scritte', icone ? 'icone' : 'parole'); } catch (e) { /* ok */ } disegna(); };
   const oka = document.getElementById('oka');
   if (oka) oka.onclick = () => { const az = { t: 'assetto', g: assG }; if (att.libero) az.pf = { ...assPf }; assChiave = ''; manda(az); };
   const okm = document.getElementById('okm');
@@ -427,11 +440,11 @@ function mappa(mia, att, vistaM) {
     g.save();
     g.translate(px(o.x), py(o.y));
     g.rotate(((o.r || 0) * Math.PI) / 180);
-    g.globalAlpha = 0.85;
+    g.globalAlpha = 0.45;
     g.fillStyle = coloreOpz(o);
     g.fillRect(-L / 2, -W / 2, L, W);
-    g.globalAlpha = 1;
-    g.lineWidth = (sel ? 4 : ex ? 3.5 : 1.5) * dpr;
+    g.globalAlpha = sel || ex ? 1 : 0.7;
+    g.lineWidth = (sel ? 3 : ex ? 2.5 : 1) * dpr;
     g.strokeStyle = sel ? '#fff' : ex ? '#40e6ff' : '#000';
     g.strokeRect(-L / 2, -W / 2, L, W);
     g.restore();
@@ -441,10 +454,37 @@ function mappa(mia, att, vistaM) {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.lineJoin = 'round';
-  const leggibili = cl * k >= 52 * dpr;   // caselle troppo piccole: le scritte solo su quella scelta
+  const leggibili = cl * k >= (icone ? 40 : 52) * dpr;   // caselle troppo piccole: le scritte solo su quella scelta
   for (const o of opz) {
     if (!leggibili && !(scelta && scelta.c === o.c)) continue;
-    const righe = righeOpz(o);
+    let righe = righeOpz(o);
+    if (icone && !o.fu) {
+      // icone delle zone con il numero, in fila; le altre scritte sopra
+      const costi = ['gomme', 'freni', 'cambio', 'carrozzeria', 'motore', 'tenuta', 'ps'].filter((k) => (o.u?.[k] || 0) > 0);
+      righe = righe.slice(0, righe.length - costi.length);
+      const D = fs * 1.25, passo = D + fs * 0.75;
+      let x = px(o.x) - ((costi.length - 1) * passo) / 2 - fs * 0.3;
+      for (const k of costi) {
+        if (ICONE[k].complete) g.drawImage(ICONE[k], x - D / 2, py(o.y) - D / 2, D, D);
+        g.textAlign = 'left';
+        g.lineWidth = 4 * dpr;
+        g.strokeStyle = '#000';
+        g.strokeText(String(o.u[k]), x + D / 2 + 1 * dpr, py(o.y));
+        g.fillStyle = '#fff';
+        g.fillText(String(o.u[k]), x + D / 2 + 1 * dpr, py(o.y));
+        g.textAlign = 'center';
+        x += passo;
+      }
+      righe.forEach(([t, c], i) => {
+        const y = py(o.y) - (costi.length ? D * 0.5 + fs * 0.6 : 0) - (righe.length - 1 - i) * fs * 1.05;
+        g.lineWidth = 4 * dpr;
+        g.strokeStyle = '#000';
+        g.strokeText(t, px(o.x), y);
+        g.fillStyle = c;
+        g.fillText(t, px(o.x), y);
+      });
+      continue;
+    }
     righe.forEach(([t, c], i) => {
       const y = py(o.y) + (i - (righe.length - 1) / 2) * fs * 1.05;
       g.lineWidth = 4 * dpr;

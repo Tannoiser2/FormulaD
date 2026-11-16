@@ -24,6 +24,7 @@ var dado_box: HBoxContainer
 var p_sx: PanelContainer
 var col_dx: VBoxContainer
 var b_mappa: Button
+var scritte_icone := func() -> bool: return true   # chiede al tabellone come sono scritte le caselle
 var finestra: Control
 const LARG_DX := 540.0
 var p_cron: PanelContainer
@@ -399,6 +400,10 @@ func chiedi() -> void:
 				[Mondo.COL_BOX, "box"], [Mondo.COL_ARRIVO, "traguardo"]]:
 			h.add_child(UI.chip(l[0], Vector2(20, 20)))
 			h.add_child(UI.testo(l[1], 18, UI.GRIGIO))
+		var bs := UI.bottone("Sulle caselle: parole" if scritte_icone.call() else "Sulle caselle: icone", 18, UI.FONDO2, 190, 34)
+		bs.pressed.connect(func(): comando.emit("scritte"))
+		h.add_child(UI.spazio(6))
+		h.add_child(bs)
 		azione.add_child(h)
 		var con_extra := false
 		for o in v.att.opz:

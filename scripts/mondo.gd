@@ -269,16 +269,17 @@ func sincronizza_danni(lista: Array) -> void:
 
 # ------------------------------------------------------------------ opzioni di mossa
 
-func _materiale(col: Color) -> StandardMaterial3D:
-	if not _mat_segno.has(col):
+func _materiale(col: Color, alfa := 0.82) -> StandardMaterial3D:
+	var chiave := Color(col.r, col.g, col.b, alfa)
+	if not _mat_segno.has(chiave):
 		var m := StandardMaterial3D.new()
-		m.albedo_color = Color(col.r, col.g, col.b, 0.82)
+		m.albedo_color = chiave
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.no_depth_test = true
 		m.render_priority = 2
-		_mat_segno[col] = m
-	return _mat_segno[col]
+		_mat_segno[chiave] = m
+	return _mat_segno[chiave]
 
 static func colore_opzione(o: Dictionary) -> Color:
 	if str(o.get("fu", "")) != "":
@@ -330,10 +331,11 @@ static func opzione_extra(o: Dictionary) -> bool:
 
 ## lista: le opzioni come nella vista ({c, x, y, u, fu, te, bx, fi, ...}): ogni casella raggiungibile si colora
 ## per intero, con scritto sopra che cosa costa; un bordo azzurro segna le caselle in più facoltative.
-func mostra_opzioni(lista: Array, da: String) -> void:
+func mostra_opzioni(lista: Array, da: String, inquadrale := true) -> void:
 	togli_opzioni()
-	var lungo: float = pista.cella * SCALA
-	var largo: float = pista.largo_cella * SCALA
+	_ultime = [lista, da]
+	var lungo: float = pista.cella * SCALA * 0.92
+	var largo: float = pista.largo_cella * SCALA * 0.9
 	var punti := [da] if da != "" else []
 	for o in lista:
 		var cid: String = o.c
@@ -344,46 +346,124 @@ func mostra_opzioni(lista: Array, da: String) -> void:
 		radice.rotation.y = -deg_to_rad(c.r if c else 0.0)
 		add_child(radice)
 		var extra := opzione_extra(o)
-		var bordo := MeshInstance3D.new()
-		var pb := PlaneMesh.new()
-		pb.size = Vector2(lungo * 0.92, largo * 0.9)
-		bordo.mesh = pb
-		bordo.material_override = _materiale(COL_EXTRA if extra else Color(0.05, 0.05, 0.08))
-		bordo.name = "bordo"
-		radice.add_child(bordo)
+		# riempimento tenue e bordo sottile (azzurro e più spesso per le caselle in più)
 		var dentro := MeshInstance3D.new()
 		var pd := PlaneMesh.new()
-		var spess := 0.05 if extra else 0.02
-		pd.size = Vector2(lungo * 0.92 - spess * 2, largo * 0.9 - spess * 2)
+		pd.size = Vector2(lungo, largo)
 		dentro.mesh = pd
-		dentro.position.y = 0.002
-		dentro.material_override = _materiale(colore_opzione(o))
+		dentro.material_override = _materiale(colore_opzione(o), 0.4)
 		radice.add_child(dentro)
+		radice.add_child(_cornice(lungo, largo, 0.03 if extra else 0.012, _col_bordo(o)))
 		if cid == da:
 			radice.scale = Vector3(0.6, 1, 0.6)
 		segni[cid] = radice
 		if cid != da:
-			var righe := righe_opzione(o)
-			for k in righe.size():
-				var l := Label3D.new()
-				l.text = righe[k][0]
-				l.font = font
-				l.font_size = 40
-				l.pixel_size = 0.0025
-				l.modulate = righe[k][1]
-				l.outline_size = 12
-				l.outline_modulate = Color(0, 0, 0, 0.95)
-				l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-				l.no_depth_test = true
-				l.render_priority = 4
-				l.outline_render_priority = 3
-				l.offset = Vector2(0, (righe.size() - 1) * 21.0 - k * 42.0)
-				l.position = radice.position + Vector3(0, 0.01, 0)
-				add_child(l)
-				radice.set_meta("righe", radice.get_meta("righe", []) + [l])
+			var nodi := _scritte_icone(o) if scritte_icone else _scritte_testo(o)
+			for n in nodi:
+				n.position = radice.position + Vector3(0, 0.01, 0)
+				add_child(n)
+			radice.set_meta("righe", nodi)
 		punti.append(cid)
-	if not lista.is_empty():
+	if not lista.is_empty() and inquadrale:
 		inquadra(punti)
+
+var _ultime: Array = []
+
+## Passa dalle icone alle parole (o viceversa) e ridisegna le caselle già mostrate.
+func cambia_scritte() -> void:
+	scritte_icone = not scritte_icone
+	if _ultime.is_empty() or segni.is_empty():
+		return
+	var sel := scelta
+	mostra_opzioni(_ultime[0], _ultime[1], false)
+	if sel != "":
+		segna_scelta(sel)
+
+var scritte_icone := true      # sulle caselle: icone delle zone con il numero, oppure le parole
+var _icone := {}
+
+static func _col_bordo(o: Dictionary) -> Color:
+	return COL_EXTRA if opzione_extra(o) else Color(0.05, 0.05, 0.08)
+
+## Il bordo di una casella: quattro listelli sottili.
+func _cornice(L: float, W: float, w: float, col: Color) -> Node3D:
+	var n := Node3D.new()
+	n.name = "bordo"
+	for k in 4:
+		var mi := MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		var lungo_x := k < 2
+		pm.size = Vector2(L, w) if lungo_x else Vector2(w, W)
+		mi.mesh = pm
+		mi.position = Vector3(0, 0.003, (W - w) * 0.5 * (1 if k == 0 else -1)) if lungo_x else Vector3((L - w) * 0.5 * (1 if k == 2 else -1), 0.003, 0)
+		mi.material_override = _materiale(col, 0.75 if col != COL_EXTRA else 0.95)
+		n.add_child(mi)
+	return n
+
+func _etichetta(t: String, col: Color, fs := 40) -> Label3D:
+	var l := Label3D.new()
+	l.text = t
+	l.font = font
+	l.font_size = fs
+	l.pixel_size = 0.0025
+	l.modulate = col
+	l.outline_size = 12
+	l.outline_modulate = Color(0, 0, 0, 0.95)
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.render_priority = 4
+	l.outline_render_priority = 3
+	return l
+
+func _scritte_testo(o: Dictionary) -> Array:
+	var righe := righe_opzione(o)
+	var out := []
+	for k in righe.size():
+		var l := _etichetta(righe[k][0], righe[k][1])
+		l.offset = Vector2(0, (righe.size() - 1) * 21.0 - k * 42.0)
+		out.append(l)
+	return out
+
+## Icone delle zone con il numero dei punti persi, in fila; sopra, in piccolo, le caselle in più e gli esiti.
+func _scritte_icone(o: Dictionary) -> Array:
+	var out := []
+	var testi := []
+	var costi := []
+	for r in righe_opzione(o):
+		testi.append(r)
+	# separa i costi delle zone (ultime righe) dagli altri testi
+	if str(o.get("fu", "")) == "":
+		for k in Dati.zone_ids() + ["ps"]:
+			var n := int(o.get("u", {}).get(k, 0))
+			if n > 0:
+				costi.append([k, n])
+				testi.pop_back()
+	const PX_ICONA := 0.0017
+	const LARGO_ICONA := 96 * 0.0017
+	const PASSO := 0.24
+	var x0 := -(costi.size() - 1) * PASSO * 0.5
+	for j in costi.size():
+		var k: String = costi[j][0]
+		if not _icone.has(k):
+			_icone[k] = load("res://assets/img/zone/%s.png" % k)
+		var sp := Sprite3D.new()
+		sp.texture = _icone[k]
+		sp.pixel_size = PX_ICONA
+		sp.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		sp.no_depth_test = true
+		sp.render_priority = 4
+		sp.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
+		sp.offset = Vector2((x0 + j * PASSO - 0.035) / PX_ICONA, 0)
+		out.append(sp)
+		var l := _etichetta(str(costi[j][1]), Color.WHITE, 44)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		l.offset = Vector2((x0 + j * PASSO - 0.035 + LARGO_ICONA * 0.5 + 0.008) / 0.0025, 0)
+		out.append(l)
+	for k in testi.size():
+		var l := _etichetta(str(testi[k][0]), testi[k][1], 32)
+		l.offset = Vector2(0, (LARGO_ICONA * 0.5 + 0.02) / 0.0025 + k * 34.0 if not costi.is_empty() else (testi.size() - 1) * 17.0 - k * 34.0)
+		out.append(l)
+	return out
 
 func togli_opzioni() -> void:
 	for k in segni:
@@ -397,13 +477,16 @@ func togli_opzioni() -> void:
 func segna_scelta(cid: String) -> void:
 	if scelta != "" and segni.has(scelta):
 		segni[scelta].scale = Vector3.ONE
-		var b0: MeshInstance3D = segni[scelta].get_node("bordo")
-		b0.material_override = _materiale(COL_EXTRA if opzione_extra(opzioni.get(scelta, {})) else Color(0.05, 0.05, 0.08))
+		var col0 := _col_bordo(opzioni.get(scelta, {}))
+		for mi in segni[scelta].get_node("bordo").get_children():
+			mi.material_override = _materiale(col0, 0.75 if col0 != COL_EXTRA else 0.95)
+			mi.scale = Vector3.ONE
 	scelta = cid
 	if segni.has(cid):
-		segni[cid].scale = Vector3(1.12, 1, 1.12)
-		var b: MeshInstance3D = segni[cid].get_node("bordo")
-		b.material_override = _materiale(Color.WHITE)
+		segni[cid].scale = Vector3(1.08, 1, 1.08)
+		for mi in segni[cid].get_node("bordo").get_children():
+			mi.material_override = _materiale(Color.WHITE, 1.0)
+			mi.scale = Vector3(1, 1, 2.5) if mi.mesh.size.y < mi.mesh.size.x else Vector3(2.5, 1, 1)
 
 # ------------------------------------------------------------------ visuale: mouse e dita
 
@@ -424,7 +507,7 @@ func _process(d: float) -> void:
 	# le scritte sulle caselle solo quando le caselle sono abbastanza grandi da leggerle
 	if pista != null and not segni.is_empty():
 		var px_cella: float = pista.cella * SCALA * vis.y / (2.0 * distanza * tan(deg_to_rad(cam.fov) * 0.5))
-		var mostra := px_cella >= 55.0
+		var mostra := px_cella >= (40.0 if scritte_icone else 55.0)
 		for cid in segni:
 			for l in segni[cid].get_meta("righe", []):
 				l.visible = mostra or cid == scelta
