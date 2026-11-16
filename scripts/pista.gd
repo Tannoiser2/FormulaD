@@ -24,6 +24,7 @@ var curva_di: Dictionary = {}  # id -> la curva in cui è, o la prossima
 var verso: Dictionary = {}     # curva -> 1 se l'interno è a destra, -1 a sinistra
 var lunghezza := 1.0
 var cella := 45.0
+var largo_cella := 40.0        # larghezza di una casella (distanza fra due corsie), in pixel
 var _cache_avanti: Dictionary = {}
 
 static var _caricate: Dictionary = {}
@@ -61,6 +62,29 @@ static func carica(pid: String) -> Pista:
 	else:
 		p.dadi = p.img * 0.5
 	p._posizioni()
+	# larghezza delle caselle: distanza dalla casella più vicina di un'altra corsia
+	var lati := []
+	var norm := []
+	for c in p.caselle:
+		if not c.pit:
+			norm.append(c)
+	for k in range(0, norm.size(), 3):
+		var c = norm[k]
+		var pc := p.pos(c.id)
+		var dir := Vector2.from_angle(deg_to_rad(float(c.r)))
+		var meglio := 1e9
+		var di := 1e9
+		for n in norm:
+			if n.l != c.l:
+				var dd := pc.distance_to(p.pos(n.id))
+				if dd < di:
+					di = dd
+					meglio = absf(dir.cross(p.pos(n.id) - pc))
+		if meglio < 1e8:
+			lati.append(meglio)
+	if lati.size() > 10:
+		lati.sort()
+		p.largo_cella = clamp(lati[lati.size() / 2], p.cella * 0.4, p.cella * 1.2)
 	_caricate[pid] = p
 	return p
 

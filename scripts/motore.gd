@@ -444,6 +444,13 @@ func anteprima(a: Dictionary, opz: Dictionary) -> Dictionary:
 					voce["bx"] = true
 				if e.finisce:
 					voce["fi"] = true
+				var ex: Dictionary = r[cid].get("extra", {})
+				for k in [["ni", "ni"], ["pi", "piu"], ["jk", "jk"]]:
+					if int(ex.get(k[1], 0)) != 0:
+						voce[k[0]] = int(ex[k[1]])
+				if int(r[cid].get("scia", 0)) > 0:
+					voce["sc"] = int(r[cid].scia)
+				voce["r"] = snappedf(float(pista.per_id[cid].r), 0.1)
 				celle[cid] = voce
 		esiti.append(meglio)
 	return {"t": esiti, "c": celle.values()}
@@ -1072,9 +1079,11 @@ func vista() -> Dictionary:
 				var p := pista.pos(cid)
 				l.append({"c": cid, "x": int(p.x), "y": int(p.y), "mo": o.mosse, "u": e.usura, "fu": e.fuori, "te": e.testa,
 					"bx": e.box, "fi": e.finisce, "to": e.tocca.size(), "pe": e.pericoli.size(), "sc": int(o.get("scia", 0)),
-					"fr": o.freno, "ol": o.oltre, "ni": int(o.get("extra", {}).get("ni", 0)), "jk": int(o.get("extra", {}).get("jk", 0))})
+					"fr": o.freno, "ol": o.oltre, "ni": int(o.get("extra", {}).get("ni", 0)), "jk": int(o.get("extra", {}).get("jk", 0)),
+					"pi": int(o.get("extra", {}).get("piu", 0)), "r": snappedf(float(pista.per_id[cid].r), 0.1)})
 			att.opz = l
 		v.att = att
 	if s.fase == "fine" and s.has("storia"):
 		v["storia"] = s.storia
+	v["cel"] = [snappedf(pista.cella, 0.1), snappedf(pista.largo_cella, 0.1)]
 	return v

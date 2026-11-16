@@ -408,6 +408,14 @@ func chiedi() -> void:
 			h.add_child(UI.chip(l[0], Vector2(20, 20)))
 			h.add_child(UI.testo(l[1], 18, UI.GRIGIO))
 		azione.add_child(h)
+		var con_extra := false
+		for o in v.att.opz:
+			con_extra = con_extra or Mondo.opzione_extra(o)
+		if con_extra:
+			var h2 := UI.riga(10)
+			h2.add_child(UI.chip(Mondo.COL_EXTRA, Vector2(20, 20)))
+			h2.add_child(UI.testo("bordo azzurro: casella in più facoltativa (scia, Nitro, gomme morbide)", 18, UI.GRIGIO))
+			azione.add_child(h2)
 
 ## Prima del via (assetto libero e gomme) o al box (gomme nuove).
 func _chiedi_assetto(i: int, a: Dictionary, col: Color) -> void:

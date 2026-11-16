@@ -290,48 +290,102 @@ static func colore_opzione(o: Dictionary) -> Color:
 		return COL_COSTO
 	return COL_LIBERA
 
-## lista: le opzioni come nella vista ({c, x, y, u, fu, te, bx, fi, ...}); toccabili: se si possono scegliere
+const COL_EXTRA := Color(0.25, 0.9, 1.0)   # bordo delle caselle in più facoltative (scia, Nitro, gomme morbide)
+const NOMI_CORTI := {"ps": "PS", "gomme": "Gomme", "freni": "Freni", "cambio": "Cambio", "carrozzeria": "Carrozz.",
+	"motore": "Motore", "tenuta": "Tenuta"}
+
+## Le scritte su una casella: che cosa costa e se usa caselle in più. Ogni riga [testo, colore].
+static func righe_opzione(o: Dictionary) -> Array:
+	var r := []
+	var ni := int(o.get("ni", 0))
+	var pi := int(o.get("pi", 0)) - ni
+	if ni > 0:
+		r.append(["NITRO +%d" % ni, COL_EXTRA])
+	if pi > 0:
+		r.append(["MORBIDE +%d" % pi, COL_EXTRA])
+	if int(o.get("sc", 0)) > 0:
+		r.append(["SCIA" if int(o.sc) == 1 else "SCIA x%d" % int(o.sc), COL_EXTRA])
+	if int(o.get("jk", 0)) != 0:
+		r.append(["DERAPATA", COL_EXTRA])
+	if str(o.get("fu", "")) != "":
+		r.append(["RITIRO", Color(1, 0.35, 0.3)])
+	elif o.get("te", false):
+		r.append(["TESTACODA", Color(1, 0.65, 0.2)])
+	if o.get("bx", false):
+		r.append(["BOX", Color(0.45, 0.8, 1)])
+	if o.get("fi", false):
+		r.append(["ARRIVO", Color.WHITE])
+	if str(o.get("fu", "")) == "":
+		for k in Dati.zone_ids() + ["ps"]:
+			var n := int(o.get("u", {}).get(k, 0))
+			if n > 0:
+				r.append(["%s -%d" % [NOMI_CORTI[k], n], Dati.COLORI_ZONE[k].lerp(Color.WHITE, 0.45)])
+	return r
+
+static func opzione_extra(o: Dictionary) -> bool:
+	return int(o.get("pi", 0)) > 0 or int(o.get("sc", 0)) > 0 or int(o.get("jk", 0)) != 0
+
+## lista: le opzioni come nella vista ({c, x, y, u, fu, te, bx, fi, ...}): ogni casella raggiungibile si colora
+## per intero, con scritto sopra che cosa costa; un bordo azzurro segna le caselle in più facoltative.
 func mostra_opzioni(lista: Array, da: String) -> void:
 	togli_opzioni()
-	var disco := CylinderMesh.new()
-	disco.top_radius = 0.15
-	disco.bottom_radius = 0.15
-	disco.height = 0.02
-	disco.radial_segments = 20
+	var lungo: float = pista.cella * SCALA
+	var largo: float = pista.largo_cella * SCALA
 	var punti := [da] if da != "" else []
 	for o in lista:
 		var cid: String = o.c
 		opzioni[cid] = o
-		var mi := MeshInstance3D.new()
-		mi.mesh = disco
-		mi.material_override = _materiale(colore_opzione(o))
-		mi.position = pos_casella(cid) + Vector3(0, 0.03, 0)
+		var radice := Node3D.new()
+		radice.position = pos_casella(cid) + Vector3(0, 0.03, 0)
+		var c = pista.per_id.get(cid)
+		radice.rotation.y = -deg_to_rad(c.r if c else 0.0)
+		add_child(radice)
+		var extra := opzione_extra(o)
+		var bordo := MeshInstance3D.new()
+		var pb := PlaneMesh.new()
+		pb.size = Vector2(lungo * 0.92, largo * 0.9)
+		bordo.mesh = pb
+		bordo.material_override = _materiale(COL_EXTRA if extra else Color(0.05, 0.05, 0.08))
+		bordo.name = "bordo"
+		radice.add_child(bordo)
+		var dentro := MeshInstance3D.new()
+		var pd := PlaneMesh.new()
+		var spess := 0.05 if extra else 0.02
+		pd.size = Vector2(lungo * 0.92 - spess * 2, largo * 0.9 - spess * 2)
+		dentro.mesh = pd
+		dentro.position.y = 0.002
+		dentro.material_override = _materiale(colore_opzione(o))
+		radice.add_child(dentro)
 		if cid == da:
-			mi.scale = Vector3(0.7, 1, 0.7)
-		add_child(mi)
-		segni[cid] = mi
-		var tot := 0
-		for k in o.get("u", {}):
-			tot += int(o.u[k])
-		if tot > 0 and str(o.get("fu", "")) == "" and not o.get("fi", false):
-			var l := Label3D.new()
-			l.text = "-%d" % tot
-			l.font = font
-			l.font_size = 36
-			l.pixel_size = 0.004
-			l.modulate = Color(0.1, 0.05, 0)
-			l.outline_size = 0
-			l.rotation.x = -PI * 0.5
-			l.position.y = 0.02
-			l.no_depth_test = true
-			l.render_priority = 3
-			mi.add_child(l)
+			radice.scale = Vector3(0.6, 1, 0.6)
+		segni[cid] = radice
+		if cid != da:
+			var righe := righe_opzione(o)
+			for k in righe.size():
+				var l := Label3D.new()
+				l.text = righe[k][0]
+				l.font = font
+				l.font_size = 40
+				l.pixel_size = 0.0025
+				l.modulate = righe[k][1]
+				l.outline_size = 12
+				l.outline_modulate = Color(0, 0, 0, 0.95)
+				l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+				l.no_depth_test = true
+				l.render_priority = 4
+				l.outline_render_priority = 3
+				l.offset = Vector2(0, (righe.size() - 1) * 21.0 - k * 42.0)
+				l.position = radice.position + Vector3(0, 0.01, 0)
+				add_child(l)
+				radice.set_meta("righe", radice.get_meta("righe", []) + [l])
 		punti.append(cid)
 	if not lista.is_empty():
 		inquadra(punti)
 
 func togli_opzioni() -> void:
 	for k in segni:
+		for l in segni[k].get_meta("righe", []):
+			l.queue_free()
 		segni[k].queue_free()
 	segni.clear()
 	opzioni.clear()
@@ -340,9 +394,13 @@ func togli_opzioni() -> void:
 func segna_scelta(cid: String) -> void:
 	if scelta != "" and segni.has(scelta):
 		segni[scelta].scale = Vector3.ONE
+		var b0: MeshInstance3D = segni[scelta].get_node("bordo")
+		b0.material_override = _materiale(COL_EXTRA if opzione_extra(opzioni.get(scelta, {})) else Color(0.05, 0.05, 0.08))
 	scelta = cid
 	if segni.has(cid):
-		segni[cid].scale = Vector3(1.6, 1, 1.6)
+		segni[cid].scale = Vector3(1.12, 1, 1.12)
+		var b: MeshInstance3D = segni[cid].get_node("bordo")
+		b.material_override = _materiale(Color.WHITE)
 
 # ------------------------------------------------------------------ visuale: mouse e dita
 
@@ -360,6 +418,13 @@ func _process(d: float) -> void:
 	if pannelli != null and pannelli.visible and pannelli.col_dx != null:
 		margine = Interfaccia.LARG_DX + 20.0
 	cam.h_offset = largo * margine / max(vis.x, 1.0) * 0.5
+	# le scritte sulle caselle solo quando le caselle sono abbastanza grandi da leggerle
+	if pista != null and not segni.is_empty():
+		var px_cella: float = pista.cella * SCALA * vis.y / (2.0 * distanza * tan(deg_to_rad(cam.fov) * 0.5))
+		var mostra := px_cella >= 55.0
+		for cid in segni:
+			for l in segni[cid].get_meta("righe", []):
+				l.visible = mostra or cid == scelta
 
 ## Gesti con due dita (iPad): pizzico = avvicina/allontana, dita che girano = ruota il tabellone,
 ## dita che scorrono insieme in verticale = inclina, in orizzontale = ruota.

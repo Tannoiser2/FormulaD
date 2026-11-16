@@ -54,6 +54,24 @@ function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp
 function usura(regole, u) {
   return ZONE[regole].filter(([id]) => (u?.[id] || 0) > 0).map(([id, n]) => `${u[id]} ${n}`).join(', ');
 }
+const NOMI_CORTI = { ps: 'PS', gomme: 'Gomme', freni: 'Freni', cambio: 'Cambio', carrozzeria: 'Carrozz.', motore: 'Motore', tenuta: 'Tenuta' };
+const CHIARI = { ps: '#f8e48c', gomme: '#9a94db', freni: '#b8d98c', cambio: '#8ccaca', carrozzeria: '#f2c98c', motore: '#ec958c', tenuta: '#c994d9' };
+function opzExtra(o) { return (o.pi || 0) > 0 || (o.sc || 0) > 0 || (o.jk || 0) !== 0; }
+// le scritte su una casella: le caselle in più e che cosa costa
+function righeOpz(o) {
+  const r = [];
+  const ni = o.ni || 0, pi = (o.pi || 0) - ni;
+  if (ni > 0) r.push([`NITRO +${ni}`, '#40e6ff']);
+  if (pi > 0) r.push([`MORBIDE +${pi}`, '#40e6ff']);
+  if (o.sc > 0) r.push([o.sc === 1 ? 'SCIA' : `SCIA x${o.sc}`, '#40e6ff']);
+  if (o.jk) r.push(['DERAPATA', '#40e6ff']);
+  if (o.fu) r.push(['RITIRO', '#ff5a4d']);
+  else if (o.te) r.push(['TESTACODA', '#ffa633']);
+  if (o.bx) r.push(['BOX', '#73ccff']);
+  if (o.fi) r.push(['ARRIVO', '#fff']);
+  if (!o.fu) for (const k of ['gomme', 'freni', 'cambio', 'carrozzeria', 'motore', 'tenuta', 'ps']) if ((o.u?.[k] || 0) > 0) r.push([`${NOMI_CORTI[k]} -${o.u[k]}`, CHIARI[k]]);
+  return r;
+}
 function coloreOpz(o) {
   if (o.fu) return COL.fuori;
   if (o.fi) return COL.arrivo;
@@ -400,25 +418,41 @@ function mappa(mia, att, vistaM) {
       g.drawImage(im, ax * s, ay * s, (bx - ax) * s, (by - ay) * s, px(ax), py(ay), (bx - ax) * k, (by - ay) * k);
     }
   }
+  // le caselle raggiungibili, intere e nella loro direzione; bordo azzurro per quelle in più facoltative
+  const [cl, cw] = stato.cel || [45, 25];
   for (const o of opz) {
     const sel = scelta && scelta.c === o.c;
-    g.beginPath();
-    g.arc(px(o.x), py(o.y), sel ? r * 1.45 : r, 0, 6.2832);
+    const ex = opzExtra(o);
+    const L = cl * 0.92 * k * (sel ? 1.15 : 1), W = cw * 0.9 * k * (sel ? 1.15 : 1);
+    g.save();
+    g.translate(px(o.x), py(o.y));
+    g.rotate(((o.r || 0) * Math.PI) / 180);
+    g.globalAlpha = 0.85;
     g.fillStyle = coloreOpz(o);
-    g.globalAlpha = 0.88;
-    g.fill();
+    g.fillRect(-L / 2, -W / 2, L, W);
     g.globalAlpha = 1;
-    g.lineWidth = sel ? 4 * dpr : 1.5 * dpr;
-    g.strokeStyle = sel ? '#fff' : '#000';
-    g.stroke();
-    const tot = Object.values(o.u || {}).reduce((a, b) => a + b, 0);
-    if (tot > 0 && !o.fu && !o.fi) {
-      g.fillStyle = '#201000';
-      g.font = `700 ${Math.round(r * 1.1)}px Barlow, sans-serif`;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText('-' + tot, px(o.x), py(o.y) + 1);
-    }
+    g.lineWidth = (sel ? 4 : ex ? 3.5 : 1.5) * dpr;
+    g.strokeStyle = sel ? '#fff' : ex ? '#40e6ff' : '#000';
+    g.strokeRect(-L / 2, -W / 2, L, W);
+    g.restore();
+  }
+  const fs = Math.max(11 * dpr, Math.min(16 * dpr, cl * k * 0.3));
+  g.font = `700 ${Math.round(fs)}px Barlow, sans-serif`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  const leggibili = cl * k >= 52 * dpr;   // caselle troppo piccole: le scritte solo su quella scelta
+  for (const o of opz) {
+    if (!leggibili && !(scelta && scelta.c === o.c)) continue;
+    const righe = righeOpz(o);
+    righe.forEach(([t, c], i) => {
+      const y = py(o.y) + (i - (righe.length - 1) / 2) * fs * 1.05;
+      g.lineWidth = 4 * dpr;
+      g.strokeStyle = '#000';
+      g.strokeText(t, px(o.x), y);
+      g.fillStyle = c;
+      g.fillText(t, px(o.x), y);
+    });
   }
   // le auto: la mia con il bordo bianco
   for (const a of stato.auto) {
