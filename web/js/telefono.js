@@ -449,7 +449,7 @@ function mappa(mia, att, vistaM) {
     g.strokeRect(-L / 2, -W / 2, L, W);
     g.restore();
   }
-  const fs = Math.max(11 * dpr, Math.min(16 * dpr, cl * k * 0.3));
+  const fs = Math.max(9 * dpr, Math.min(13 * dpr, cl * k * 0.24));
   g.font = `700 ${Math.round(fs)}px Barlow, sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';

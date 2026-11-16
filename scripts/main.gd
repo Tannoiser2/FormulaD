@@ -381,7 +381,12 @@ func _mostra(ev: Array) -> void:
 				await mondo.testacoda(int(e.auto))
 			"fuori":
 				rete.suono("botto")
+				mondo.esplosione(str(mondo.auto_casella.get(int(e.auto), e.get("c", ""))))
 				await mondo.elimina_auto(int(e.auto))
+			"usura":
+				mondo.sbuffo(int(e.auto))
+			"urto":
+				await mondo.urto(int(e.auto), int(e.contro), bool(e.colpo))
 			"arrivo":
 				rete.suono("arrivo")
 				await mondo.arriva_auto(int(e.auto))

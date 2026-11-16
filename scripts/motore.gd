@@ -946,6 +946,7 @@ func _collisione(a: Dictionary, b: Dictionary) -> void:
 			return
 		var v := _nero()
 		var colpo := v <= (2 if pioggia() else 1) if avanzate() else v <= 4
+		eventi.append({"t": "urto", "auto": a.i, "contro": b.i, "colpo": colpo})
 		if colpo:
 			_nero_evento(a, v, "contatto con %s" % b.nome, "collisione!", true)
 			_usura(a, {"carrozzeria": 1} if avanzate() else {"ps": 1}, "collisione con %s" % b.nome)

@@ -193,22 +193,37 @@ func muovi_auto(i: int, percorso: Array) -> void:
 	n.visible = true
 	var passo: float = clamp(1.4 / percorso.size(), 0.05, 0.16) / velocita
 	var tw := create_tween()
+	# il muso va dove va l'auto: la direzione è quella del tratto percorso, non quella scritta sulla casella
+	# (così nessuna giravolta), e girando si prende sempre il verso più corto
+	var ang_ora: float = n.rotation.y
 	for k in range(1, percorso.size()):
 		var p := pos_casella(percorso[k])
-		var ang := _angolo(percorso[k])
-		var da := n.rotation.y if k == 1 else _angolo(percorso[k - 1])
-		ang = da + wrapf(ang - da, -PI, PI)
+		var ang := _verso(pos_casella(percorso[k - 1]), p, _angolo(percorso[k]))
+		ang = ang_ora + wrapf(ang - ang_ora, -PI, PI)
+		ang_ora = ang
 		tw.tween_property(n, "position", p, passo)
 		tw.parallel().tween_property(n, "rotation:y", ang, passo)
+	# all'arrivo si allinea alla casella, se non è troppo diversa dal verso di marcia
+	var fine := _angolo(percorso[-1])
+	if absf(wrapf(fine - ang_ora, -PI, PI)) < PI * 0.5:
+		tw.tween_property(n, "rotation:y", ang_ora + wrapf(fine - ang_ora, -PI, PI), passo)
 	auto_casella[i] = percorso[-1]
 	await tw.finished
+
+## L'angolo del tratto da a a b (se le due caselle coincidono, quello di riserva).
+func _verso(a: Vector3, b: Vector3, riserva: float) -> float:
+	var d := b - a
+	if Vector2(d.x, d.z).length() < 0.01:
+		return riserva
+	return atan2(d.x, d.z)
 
 func testacoda(i: int) -> void:
 	if not auto.has(i):
 		return
 	var n: Node3D = auto[i]
 	var tw := create_tween()
-	tw.tween_property(n, "rotation:y", n.rotation.y + PI * 3.0, 0.7 / velocita).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# due giri interi: l'auto finisce con il muso in avanti
+	tw.tween_property(n, "rotation:y", n.rotation.y + TAU * 2.0, 0.8 / velocita).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	await tw.finished
 
 func elimina_auto(i: int) -> void:
@@ -405,7 +420,7 @@ func _etichetta(t: String, col: Color, fs := 40) -> Label3D:
 	l.text = t
 	l.font = font
 	l.font_size = fs
-	l.pixel_size = 0.0025
+	l.pixel_size = 0.002
 	l.modulate = col
 	l.outline_size = 12
 	l.outline_modulate = Color(0, 0, 0, 0.95)
@@ -438,9 +453,9 @@ func _scritte_icone(o: Dictionary) -> Array:
 			if n > 0:
 				costi.append([k, n])
 				testi.pop_back()
-	const PX_ICONA := 0.0017
-	const LARGO_ICONA := 96 * 0.0017
-	const PASSO := 0.24
+	const PX_ICONA := 0.0013
+	const LARGO_ICONA := 96 * 0.0013
+	const PASSO := 0.19
 	var x0 := -(costi.size() - 1) * PASSO * 0.5
 	for j in costi.size():
 		var k: String = costi[j][0]
@@ -453,15 +468,15 @@ func _scritte_icone(o: Dictionary) -> Array:
 		sp.no_depth_test = true
 		sp.render_priority = 4
 		sp.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
-		sp.offset = Vector2((x0 + j * PASSO - 0.035) / PX_ICONA, 0)
+		sp.offset = Vector2((x0 + j * PASSO - 0.03) / PX_ICONA, 0)
 		out.append(sp)
 		var l := _etichetta(str(costi[j][1]), Color.WHITE, 44)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		l.offset = Vector2((x0 + j * PASSO - 0.035 + LARGO_ICONA * 0.5 + 0.008) / 0.0025, 0)
+		l.offset = Vector2((x0 + j * PASSO - 0.03 + LARGO_ICONA * 0.5 + 0.006) / 0.002, 0)
 		out.append(l)
 	for k in testi.size():
 		var l := _etichetta(str(testi[k][0]), testi[k][1], 32)
-		l.offset = Vector2(0, (LARGO_ICONA * 0.5 + 0.02) / 0.0025 + k * 34.0 if not costi.is_empty() else (testi.size() - 1) * 17.0 - k * 34.0)
+		l.offset = Vector2(0, (LARGO_ICONA * 0.5 + 0.02) / 0.002 + k * 34.0 if not costi.is_empty() else (testi.size() - 1) * 17.0 - k * 34.0)
 		out.append(l)
 	return out
 
@@ -731,7 +746,7 @@ func replay(storia: Dictionary, lista: Array) -> void:
 				var a0 := pos_casella(p[j])
 				var a1 := pos_casella(p[j + 1])
 				n.position = a0.lerp(a1, u)
-				n.rotation.y = lerp_angle(_angolo(p[j]), _angolo(p[j + 1]), u)
+				n.rotation.y = lerp_angle(n.rotation.y, _verso(a0, a1, _angolo(p[j + 1])), clamp(d * 12.0, 0.0, 1.0))
 				fatto[i] = prima + x
 			else:
 				# fermo: l'ultima casella raggiunta
@@ -851,3 +866,129 @@ func segna_mappa(cid: String) -> void:
 		l.position = pos_casella(lista[k]) + Vector3(0, 0.08, 0)
 		add_child(l)
 		_mappa_sigle.append(l)
+
+# ------------------------------------------------------------------ effetti: polvere, urti, esplosioni
+
+var _mat_fx := {}
+
+func _mat_particelle(col: Color, emette := false) -> StandardMaterial3D:
+	var k := str(col) + str(emette)
+	if not _mat_fx.has(k):
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.vertex_color_use_as_albedo = true
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.albedo_color = col
+		if emette:
+			m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		# una macchiolina tonda e sfumata
+		var gt := GradientTexture2D.new()
+		gt.fill = GradientTexture2D.FILL_RADIAL
+		gt.fill_from = Vector2(0.5, 0.5)
+		gt.fill_to = Vector2(0.5, 0.0)
+		gt.width = 64
+		gt.height = 64
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		g.add_point(0.5, Color(1, 1, 1, 0.8))
+		gt.gradient = g
+		m.albedo_texture = gt
+		_mat_fx[k] = m
+	return _mat_fx[k]
+
+## Una nuvoletta di particelle che parte da p e si spegne da sola.
+func _nuvola(p: Vector3, quante: int, col_a: Color, col_b: Color, raggio: float, vel: float, durata: float,
+		dir := Vector3.UP, apertura := 60.0, grande := 0.08, fuoco := false) -> void:
+	var cp := CPUParticles3D.new()
+	cp.one_shot = true
+	cp.explosiveness = 0.9
+	cp.amount = quante
+	cp.lifetime = durata
+	cp.local_coords = false
+	var q := QuadMesh.new()
+	q.size = Vector2(grande, grande)
+	cp.mesh = q
+	cp.material_override = _mat_particelle(Color.WHITE, fuoco)
+	cp.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	cp.emission_sphere_radius = raggio
+	cp.direction = dir
+	cp.spread = apertura
+	cp.gravity = Vector3(0, -0.6, 0)
+	cp.initial_velocity_min = vel * 0.5
+	cp.initial_velocity_max = vel
+	cp.damping_min = vel * 1.2
+	cp.damping_max = vel * 2.0
+	cp.scale_amount_min = 0.6
+	cp.scale_amount_max = 1.6
+	var curva := Curve.new()
+	curva.add_point(Vector2(0, 0.5))
+	curva.add_point(Vector2(0.3, 1.0))
+	curva.add_point(Vector2(1, 1.6))
+	cp.scale_amount_curve = curva
+	var g := Gradient.new()
+	g.set_color(0, col_a)
+	g.set_color(1, Color(col_b.r, col_b.g, col_b.b, 0.0))
+	cp.color_ramp = g
+	cp.position = p
+	add_child(cp)
+	cp.emitting = true
+	get_tree().create_timer(durata + 0.3).timeout.connect(cp.queue_free)
+
+## Sbuffo di polvere dietro l'auto che ha consumato gomme, freni o altro.
+func sbuffo(i: int) -> void:
+	if not auto.has(i) or not auto[i].visible:
+		return
+	var n: Node3D = auto[i]
+	var dietro := -Vector3(sin(n.rotation.y), 0, cos(n.rotation.y))
+	_nuvola(n.position + dietro * 0.3 + Vector3(0, 0.08, 0), 24, Color(0.92, 0.88, 0.8, 0.95), Color(0.7, 0.65, 0.6),
+		0.06, 1.0, 1.0 / velocita, dietro + Vector3(0, 0.5, 0), 40.0, 0.2)
+
+## Due auto si toccano: si avvicinano di colpo, rimbalzano, scintille in mezzo.
+func urto(i: int, j: int, colpo: bool) -> void:
+	if not auto.has(i) or not auto.has(j):
+		return
+	var a: Node3D = auto[i]
+	var b: Node3D = auto[j]
+	var pa := a.position
+	var pb := b.position
+	var verso := (pb - pa)
+	verso.y = 0
+	var d := verso.length()
+	verso = verso.normalized() if d > 0.001 else Vector3.RIGHT
+	var spinta: float = min(d * 0.3, 0.12)
+	var t := 0.12 / velocita
+	var tw := create_tween()
+	tw.tween_property(a, "position", pa + verso * spinta, t).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(b, "position", pb - verso * spinta * 0.5, t).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func():
+		var mezzo := (a.position + b.position) * 0.5 + Vector3(0, 0.1, 0)
+		_nuvola(mezzo, 30 if colpo else 16, Color(1, 1, 0.7, 1), Color(1, 0.45, 0.05), 0.03, 2.2, 0.5 / velocita,
+			Vector3.UP, 100.0, 0.1, true))
+	tw.tween_property(a, "position", pa - verso * spinta * 0.3, t * 1.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(b, "position", pb + verso * spinta * 0.3, t * 1.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(a, "position", pa, t)
+	tw.parallel().tween_property(b, "position", pb, t)
+	if colpo:
+		tw.parallel().tween_property(a, "rotation:z", 0.25, t * 0.5)
+		tw.tween_property(a, "rotation:z", 0.0, t)
+	await tw.finished
+
+## Esplosione sulla casella del ritiro: lampo, fuoco e fumo.
+func esplosione(cid: String) -> void:
+	if cid == "" or pista == null or not pista.per_id.has(cid):
+		return
+	var p := pos_casella(cid) + Vector3(0, 0.08, 0)
+	var luce := OmniLight3D.new()
+	luce.light_color = Color(1, 0.6, 0.2)
+	luce.light_energy = 6.0
+	luce.omni_range = 2.5
+	luce.position = p + Vector3(0, 0.4, 0)
+	add_child(luce)
+	var tw := create_tween()
+	tw.tween_property(luce, "light_energy", 0.0, 0.7 / velocita)
+	tw.tween_callback(luce.queue_free)
+	_nuvola(p, 45, Color(1, 0.95, 0.6, 1), Color(1, 0.3, 0.05), 0.05, 2.2, 0.6 / velocita, Vector3.UP, 180.0, 0.18, true)
+	_nuvola(p + Vector3(0, 0.12, 0), 14, Color(0.35, 0.32, 0.3, 0.6), Color(0.2, 0.2, 0.2), 0.08, 0.9, 1.6 / velocita,
+		Vector3.UP, 20.0, 0.22)
