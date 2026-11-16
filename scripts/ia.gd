@@ -12,6 +12,8 @@ static func decidi(m: Motore, livello := 1) -> Dictionary:
 		return {}
 	var a: Dictionary = m.s.auto[att.auto]
 	var rumore: float = [3.0, 0.8, 0.0][clamp(livello, 0, 2)]
+	if att.tipo == "assetto":
+		return m.assetto_ia(a, att.get("box", false))
 	if att.tipo == "mossa":
 		return {"t": "mossa", "c": _migliore(m, a, m.opzioni, a.marcia, a.pf, rumore)[0]}
 	var best_m := 1
@@ -101,6 +103,9 @@ static func valuta(m: Motore, a: Dictionary, o: Dictionary, marcia: int, pf: Dic
 		p -= e.tocca.size() * (0.05 if m.avanzate() else 0.2) * _peso(m, zc, dopo[zc])
 	if not e.pericoli.is_empty():
 		p -= e.pericoli.size() * 0.2 * _peso(m, "tenuta", dopo.get("tenuta", 2))
+	var ex: Dictionary = o.get("extra", {})
+	if int(ex.get("ni", 0)) > 0:
+		p -= 2.0
 	var c = pista.per_id[o.casella]
 	var da = pista.per_id[a.c]
 	var serve := _serve_box(m, a, pf)

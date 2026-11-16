@@ -7,17 +7,23 @@ func _init() -> void:
 	var n := int(arg[0]) if arg.size() > 0 else 10
 	var solo_regole := arg[1] if arg.size() > 1 else ""
 	var solo_pista := arg[2] if arg.size() > 2 else ""
+	var varianti := arg[3] if arg.size() > 3 else ""
 	var t0 := Time.get_ticks_msec()
 	var errori := 0
-	var stat := {"arrivi": 0, "fuori": 0, "turni": 0, "decisioni": 0, "box": 0, "scie": 0, "testacoda": 0}
+	var stat := {"arrivi": 0, "fuori": 0, "turni": 0, "decisioni": 0, "box": 0, "scie": 0, "testacoda": 0, "nitro": 0,
+		"meteo": 0, "assetti": 0}
 	for g in n:
 		var regole: String = solo_regole if solo_regole != "" else ["base", "avanzate"][g % 2]
 		var pid: String = solo_pista if solo_pista != "" else Dati.PISTE[g % Dati.PISTE.size()]
 		var lista := []
 		var quante := 2 + (g * 3) % 9
 		for i in quante:
-			lista.append({"nome": Dati.PILOTI[i].nome, "pilota": i, "tipo": "ia"})
-		var m := Motore.nuova({"regole": regole, "pista": pid, "giri": 1 + g % 2, "auto": lista, "seme": 1000 + g})
+			lista.append({"nome": Dati.PILOTI[i].nome, "pilota": i, "tipo": "umano" if (i == 0 and g % 2 == 1) else "ia"})
+		var opzioni := {}
+		if varianti != "":
+			opzioni = [{}, {"meteo": true, "libero": true}, {"strada": true}, {"strada": true, "meteo": true}][g % 4]
+		var m := Motore.nuova({"regole": regole, "pista": pid, "giri": 1 + g % 2 + (1 if varianti != "" and g % 3 == 0 else 0),
+			"auto": lista, "seme": 1000 + g, "opzioni": opzioni})
 		m.avanza()
 		var passi := 0
 		while m.s.fase == "gara" and passi < 5000:
@@ -48,6 +54,12 @@ func _init() -> void:
 					stat.testacoda += 1
 				elif e.t == "muovi" and e.scia > 0:
 					stat.scie += 1
+				elif e.t == "nitro":
+					stat.nitro += 1
+				elif e.t == "meteo":
+					stat.meteo += 1
+				elif e.t == "assetto":
+					stat.assetti += 1
 		if m.s.fase != "fine":
 			print("ERRORE: gara %d non finita dopo %d decisioni (turno %d)" % [g, passi, m.s.turno])
 			errori += 1

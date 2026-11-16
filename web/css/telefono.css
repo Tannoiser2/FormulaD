@@ -50,7 +50,7 @@ body.gara #app { max-width: none; height: 100%; display: block; }
 .cruscotto canvas { display: block; width: 100%; max-width: 46dvh; margin: 0 auto; border-radius: 8px; touch-action: manipulation; }
 .chi { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .chi .nome { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 60px; }
-.chi .dati { color: #9ea7b6; font-weight: 500; font-size: 15px; white-space: nowrap; }
+.chi .dati { color: #9ea7b6; font-weight: 500; font-size: 15px; line-height: 1.1; min-width: 0; }
 .zone { display: flex; gap: 3px; }
 .zona { flex: 1 1 0; min-width: 0; border-radius: 6px; padding: 0 2px; background: #0d1016; border-bottom: 4px solid #888; text-align: center;
   font-size: 11px; font-weight: 500; line-height: 1.1; overflow: hidden; }
@@ -94,3 +94,20 @@ body.gara #app { max-width: none; height: 100%; display: block; }
   font-weight: 400; font-size: 34px; border: 2px solid #fff; }
 .lampo { animation: lampo .5s 3; }
 @keyframes lampo { 50% { background: #5c4a00; } }
+/* preparazione dell'auto: punti e gomme */
+.assetto { display: grid; grid-template-columns: minmax(96px, 1fr) 44px 34px 44px; gap: 4px 6px; align-items: center; margin: 4px 0; }
+.assetto span { font-size: 16px; white-space: nowrap; }
+.assetto b { font-size: 21px; text-align: center; }
+.azione .assetto button { min-height: 38px; font-size: 22px; padding: 0; margin: 0; }
+.gomme { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.azione .gomme button { flex: 1 1 90px; font-size: 16px; min-height: 40px; background: #2b3242; }
+.azione .gomme button.su { background: #d61f1f; }
+/* durante la preparazione la pista non serve: tutto lo spazio al pannello */
+.gioco.prep { grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "ordine" "cruscotto"; }
+.gioco.prep .pista { display: none; }
+.gioco.prep .cruscotto { overflow-y: auto; }
+.gioco.prep .cruscotto .zone { display: none; }
+@media (orientation: landscape) {
+  .gioco.prep { grid-template-columns: minmax(0, 1fr) 132px; grid-template-rows: minmax(0, 1fr); grid-template-areas: "cruscotto ordine"; }
+  .gioco.prep .assetto { grid-template-columns: repeat(2, minmax(96px, 1fr) 44px 34px 44px); column-gap: 10px; }
+}

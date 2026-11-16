@@ -29,6 +29,9 @@ var auto_plancia := -1
 var _pannelli: Array = []
 var b_segui: Button
 var marcia_vista := 0         # la marcia toccata una volta: si vedono le caselle, il secondo tocco conferma
+var _ass_pf: Dictionary = {}   # assetto in preparazione
+var _ass_g := ""
+var _ass_chi := -1
 
 ## Il pulsante dice se la telecamera insegue le mosse oppure resta dove la si mette.
 func segna_segui(si: bool) -> void:
@@ -155,7 +158,9 @@ func aggiorna(vista: Dictionary, mie: Array) -> void:
 	var giro_max := 0
 	for a in v.auto:
 		giro_max = max(giro_max, int(a.g))
-	barra_info.text = "%s  -  Turno %d  -  Giro %d di %d" % [Dati.NOMI_REGOLE[v.regole], int(v.turno), clamp(giro_max, 1, int(v.giri)), int(v.giri)]
+	var info := "%s%s  -  Turno %d  -  Giro %d di %d" % [Dati.NOMI_REGOLE[v.regole], "  -  Su strada" if v.get("str", false) else "",
+		int(v.turno), clamp(giro_max, 1, int(v.giri)), int(v.giri)]
+	barra_info.text = info
 	_classifica()
 	# la plancia: quella dell'auto di turno se è mia, altrimenti la mia (o quella di turno)
 	var chi := -1
@@ -171,8 +176,15 @@ func aggiorna(vista: Dictionary, mie: Array) -> void:
 func mostra_plancia(i: int) -> void:
 	auto_plancia = i
 	var a: Dictionary = v.auto[i]
-	plancia_nome.text = "%s  -  %s%s" % [a.n, Dati.NOMI_MARCE[int(a.m)] if int(a.m) > 0 else "in griglia",
-		"  -  ultimo tiro %d" % int(a.d) if int(a.d) > 0 else ""]
+	var extra := ""
+	if v.get("mon", false):
+		extra += "  -  gomme %s" % Dati.NOMI_GOMME[str(a.get("gt", "dure"))].to_lower()
+	if v.get("str", false):
+		extra += "  -  Nitro %s" % ("pronto" if a.get("ni", false) else "usato")
+	plancia_nome.text = "%s  -  %s%s%s" % [a.n, Dati.NOMI_MARCE[int(a.m)] if int(a.m) > 0 else "in griglia",
+		"  -  ultimo tiro %d" % int(a.d) if int(a.d) > 0 else "", extra]
+	plancia_nome.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	plancia_nome.custom_minimum_size.x = 430
 	plancia_nome.add_theme_color_override("font_color", Dati.colore_auto(int(a.p)).lightened(0.3))
 	plancia.imposta(v.regole, a.pf, int(a.m))
 
@@ -236,6 +248,8 @@ func _classifica() -> void:
 		lista.add_child(leg)
 	else:
 		lista.add_child(UI.testo("Il numero giallo sono i Punti Struttura rimasti", 18, UI.GRIGIO))
+	if int(v.get("mt", -1)) >= 0:
+		lista.add_child(UI.testo("Meteo: %s" % Dati.NOMI_METEO[int(v.mt)], 22, UI.GIALLO))
 
 func cronaca(t: String, tipo := "info") -> void:
 	var col := UI.CHIARO
@@ -327,6 +341,9 @@ func chiedi() -> void:
 				b.pressed.connect(func(): comando.emit("decidi"))
 				azione.add_child(b)
 		return
+	if v.att.tipo == "assetto":
+		_chiedi_assetto(i, a, col)
+		return
 	if v.att.tipo == "marcia":
 		azione.add_child(UI.testo("%s: scegli la marcia" % a.n, 32, col, true))
 		var h := UI.riga(10)
@@ -378,6 +395,88 @@ func chiedi() -> void:
 			h.add_child(UI.testo(l[1], 18, UI.GRIGIO))
 		azione.add_child(h)
 
+## Prima del via (assetto libero e gomme) o al box (gomme nuove).
+func _chiedi_assetto(i: int, a: Dictionary, col: Color) -> void:
+	var att: Dictionary = v.att
+	if _ass_chi != i or _ass_pf.is_empty():
+		_ass_chi = i
+		_ass_pf = {}
+		for k in att.pf:
+			_ass_pf[k] = int(att.pf[k])
+		_ass_g = str(att.g)
+		if att.box and att.gomme.has("pioggia") and int(v.get("mt", -1)) >= 2:
+			_ass_g = "pioggia"
+	var titolo := "%s: gomme nuove al box" % a.n if att.box else "%s: prepara l'auto" % a.n
+	azione.add_child(UI.testo(titolo, 32, col, true))
+	if int(v.get("mt", -1)) >= 0:
+		azione.add_child(UI.testo("Meteo: %s" % Dati.NOMI_METEO[int(v.mt)], 24, UI.GIALLO))
+	var tot := 0
+	for k in _ass_pf:
+		tot += int(_ass_pf[k])
+	if att.libero:
+		azione.add_child(UI.testo("Ripartisci %d punti fra le zone (Gomme 1-14, le altre 1-7)." % Dati.ASSETTO_TOTALE, 20, UI.GRIGIO, false, 600))
+		var g := GridContainer.new()
+		g.columns = 6
+		g.add_theme_constant_override("h_separation", 8)
+		g.add_theme_constant_override("v_separation", 4)
+		azione.add_child(g)
+		for z in Dati.zone(v.regole):
+			var zid: String = z.id
+			var ln := UI.testo(z.nome, 22, Dati.COLORI_ZONE[zid].lightened(0.35))
+			ln.custom_minimum_size.x = 190
+			g.add_child(ln)
+			var bm := UI.bottone("-", 26, UI.FONDO2, 48, 40)
+			bm.disabled = int(_ass_pf[zid]) <= Dati.ASSETTO_MIN
+			bm.pressed.connect(func():
+				_ass_pf[zid] = int(_ass_pf[zid]) - 1
+				chiedi())
+			g.add_child(bm)
+			var lv := UI.testo(str(_ass_pf[zid]), 26, UI.CHIARO, true)
+			lv.custom_minimum_size.x = 44
+			lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			g.add_child(lv)
+			var bp := UI.bottone("+", 26, UI.FONDO2, 48, 40)
+			bp.disabled = int(_ass_pf[zid]) >= int(z.max) or tot >= Dati.ASSETTO_TOTALE
+			bp.pressed.connect(func():
+				_ass_pf[zid] = int(_ass_pf[zid]) + 1
+				chiedi())
+			g.add_child(bp)
+			var lm := UI.testo("max %d" % int(z.max), 18, UI.GRIGIO)
+			lm.custom_minimum_size.x = 70
+			g.add_child(lm)
+			g.add_child(UI.spazio(4))
+		var resta := Dati.ASSETTO_TOTALE - tot
+		var tr := "Tutti i %d punti ripartiti" % Dati.ASSETTO_TOTALE
+		if resta > 0:
+			tr = "Punti da ripartire: %d" % resta
+		elif resta < 0:
+			tr = "Punti di troppo: %d (togline qualcuno)" % -resta
+		var lr := UI.testo(tr,
+			22, UI.GIALLO if resta != 0 else Color(0.5, 0.9, 0.5))
+		azione.add_child(lr)
+	if att.gomme.size() > 1:
+		var h := UI.riga(8)
+		h.alignment = BoxContainer.ALIGNMENT_CENTER
+		azione.add_child(h)
+		for gt in att.gomme:
+			var nome_g: String = gt
+			var b := UI.bottone("Gomme " + Dati.NOMI_GOMME[gt].to_lower(), 22, UI.ROSSO if _ass_g == gt else UI.FONDO2, 190, 48)
+			b.pressed.connect(func():
+				_ass_g = nome_g
+				chiedi())
+			h.add_child(b)
+		azione.add_child(UI.testo(Dati.DESCR_GOMME.get(_ass_g, ""), 20, UI.CHIARO, false, 600))
+	var ok := UI.bottone("CONFERMA", 32, Color(0.1, 0.6, 0.2), 300, 58)
+	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	ok.disabled = att.libero and tot != Dati.ASSETTO_TOTALE
+	ok.pressed.connect(func():
+		var az := {"t": "assetto", "g": _ass_g}
+		if att.libero:
+			az["pf"] = _ass_pf.duplicate()
+		_ass_chi = -1
+		decisione.emit(az))
+	azione.add_child(ok)
+
 const COL_ESITO := [Mondo.COL_LIBERA, Mondo.COL_COSTO, Mondo.COL_TESTA, Mondo.COL_FUORI]
 
 ## Un tiro possibile e che cosa costa nel caso migliore.
@@ -408,6 +507,10 @@ static func testo_opzione(regole: String, o: Dictionary) -> String:
 		parti.append("frena %d" % int(o.fr))
 	if int(o.ol) > 0:
 		parti.append("lungo di %d" % int(o.ol))
+	if int(o.get("ni", 0)) > 0:
+		parti.append("con il Nitro (+%d)" % int(o.ni))
+	if int(o.get("jk", 0)) != 0:
+		parti.append("derapata")
 	var t := ", ".join(parti) + "."
 	if o.fi:
 		return t + " TRAGUARDO!"

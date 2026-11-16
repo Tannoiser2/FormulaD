@@ -33,6 +33,17 @@ let inviata = -1;        // numero dello stato a cui ho già risposto
 let toccavaAMe = false;
 let errore = '';
 const immagini = {};
+let assChiave = '';      // assetto in preparazione sul telefono
+let assPf = {};
+let assG = '';
+const GOMME = { dure: 'Dure', morbide: 'Morbide', pioggia: 'Da pioggia' };
+const DESCR_GOMME = {
+  dure: 'Sempre affidabili. Pioggia: +3 in curva.',
+  morbide: 'Asciutto: +1 casella facoltativa (primo giro), lungo in curva costa il doppio. Pioggia: +3 in curva.',
+  pioggia: 'Pioggia: +1 in curva. Asciutto: lungo in curva costa il doppio.',
+};
+const METEO = ['Bel tempo', 'Variabile', 'Pioggia (variabile)', 'Pioggia'];
+const MAX_ZONA = { gomme: 14, freni: 7, cambio: 7, carrozzeria: 7, motore: 7, tenuta: 7 };
 
 function colore(p) {
   const [, sc, variante] = PILOTI[p];
@@ -56,6 +67,8 @@ function testoOpz(regole, o) {
   if (o.sc > 0) parti.push('in scia');
   if (o.fr > 0) parti.push(`frena ${o.fr}`);
   if (o.ol > 0) parti.push(`lungo di ${o.ol}`);
+  if (o.ni > 0) parti.push(`con il Nitro (+${o.ni})`);
+  if (o.jk) parti.push('derapata');
   let t = parti.join(', ') + '.';
   if (o.fi) return t + ' TRAGUARDO!';
   const c = usura(regole, o.u);
@@ -170,6 +183,8 @@ function disegna() {
     } else {
       az = `<h2>Tocca a te: scegli la marcia</h2><p class="sotto">Tocca una marcia cerchiata sulla plancia: vedrai dove puoi arrivare. Toccala ancora per confermare.</p>`;
     }
+  } else if (tocca && att.tipo === 'assetto') {
+    az = assetto(att, mia);
   } else if (tocca && att.tipo === 'mossa') {
     az = `<h2>Tiro <span class="dado" style="background:${COL_MARCE[mia.m]};color:${mia.m === 1 ? '#111' : '#fff'}">${att.tiro}</span> in ${MARCE[mia.m]}</h2>
       <div id="det" class="dettaglio ${scelta && (scelta.fu || scelta.te) ? 'male' : ''}">${scelta ? esc(testoOpz(stato.regole, scelta)) : 'Tocca una casella colorata sulla pista.'}</div>
@@ -186,6 +201,9 @@ function disegna() {
   let testa = '';
   if (mia) {
     let st = `${mia.m > 0 ? MARCE[mia.m] : 'in griglia'} - giro ${Math.max(1, Math.min(mia.g, stato.giri))} di ${stato.giri}${mia.d ? ' - tiro ' + mia.d : ''}`;
+    if (stato.mt >= 0) st += ` - ${METEO[stato.mt]}`;
+    if (stato.mon) st += ` - gomme ${(GOMME[mia.gt] || 'dure').toLowerCase()}`;
+    if (stato.str) st += ` - Nitro ${mia.ni ? 'pronto' : 'usato'}`;
     if (mia.pa > 0) st = `ARRIVATO: ${mia.pa}° posto`;
     else if (mia.f) st = `RITIRATO: ${esc(mia.w)}`;
     testa = `<div class="chi"><span class="nome" style="color:${colore(mia.p)}">${esc(mia.n)}</span><span class="dati">${st}</span></div>
@@ -193,16 +211,49 @@ function disegna() {
     `<div class="zona ${mia.pf[id] <= 1 ? 'poco' : ''}" style="border-color:${c}"><span>${n}</span><b>${Math.max(0, mia.pf[id])}</b></div>`).join('')}</div>`;
   }
 
-  app.innerHTML = `<div class="gioco">
+  const prep = tocca && att.tipo === 'assetto';
+  app.innerHTML = `<div class="gioco ${prep ? 'prep' : ''}">
     <div class="ordine">${ordine(io)}</div>
-    <div class="cruscotto ${tocca ? 'tocca' : ''}">${mia ? '<canvas id="plancia"></canvas>' : ''}${testa}<div class="azione">${az}</div></div>
+    <div class="cruscotto ${tocca ? 'tocca' : ''}">${mia && !prep ? '<canvas id="plancia"></canvas>' : ''}${testa}<div class="azione">${az}</div></div>
     <div class="pista"><canvas id="mappa"></canvas></div></div>`;
+  app.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { assPf[b.dataset.z] += Number(b.dataset.d); disegna(); }; });
+  app.querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => { assG = b.dataset.g; disegna(); }; });
+  const oka = document.getElementById('oka');
+  if (oka) oka.onclick = () => { const az = { t: 'assetto', g: assG }; if (att.libero) az.pf = { ...assPf }; assChiave = ''; manda(az); };
   const okm = document.getElementById('okm');
   if (okm) okm.onclick = () => manda({ t: 'marcia', m: marciaVista });
   const ok = document.getElementById('ok');
   if (ok) ok.onclick = () => { if (scelta) manda({ t: 'mossa', c: scelta.c }); };
+  if (prep) return;
   if (mia) plancia(mia, tocca && att.tipo === 'marcia' ? att.marce : []);
   mappa(mia, tocca ? att : null, vistaM);
+}
+
+// Prima del via (punti liberi e gomme) o al box (gomme nuove).
+function assetto(att, mia) {
+  const chiave = `${att.auto}-${att.box}-${mia.g}-${stato.turno}`;
+  if (chiave !== assChiave) {
+    assChiave = chiave;
+    assPf = { ...att.pf };
+    assG = att.g;
+    if (att.box && att.gomme.includes('pioggia') && stato.mt >= 2) assG = 'pioggia';
+  }
+  let h = `<h2>${att.box ? 'Box: gomme nuove' : "Prepara l'auto"}${stato.mt >= 0 ? ` <small>${METEO[stato.mt]}</small>` : ''}</h2>`;
+  let tot = 0;
+  for (const k in assPf) tot += assPf[k];
+  if (att.libero) {
+    h += '<div class="assetto">' + ZONE.avanzate.map(([id, n, c]) => `<span style="color:${c}">${n}</span>
+      <button data-z="${id}" data-d="-1" ${assPf[id] <= 1 ? 'disabled' : ''}>-</button><b>${assPf[id]}</b>
+      <button data-z="${id}" data-d="1" ${assPf[id] >= MAX_ZONA[id] || tot >= 20 ? 'disabled' : ''}>+</button>`).join('') + '</div>';
+    const resta = 20 - tot;
+    h += `<p class="sotto" style="color:${resta ? '#ffd21a' : '#7be07b'}">${resta > 0 ? 'Punti da ripartire: ' + resta : resta < 0 ? 'Punti di troppo: ' + -resta : 'Tutti i 20 punti ripartiti'}</p>`;
+  }
+  if (att.gomme.length > 1) {
+    h += '<div class="gomme">' + att.gomme.map((g) => `<button data-g="${g}" class="${g === assG ? 'su' : ''}">${GOMME[g]}</button>`).join('') + '</div>';
+    h += `<p class="sotto">${DESCR_GOMME[assG] || ''}</p>`;
+  }
+  h += `<button id="oka" class="verde" ${att.libero && tot !== 20 ? 'disabled' : ''}>CONFERMA</button>`;
+  return h;
 }
 
 function ordine(io) {

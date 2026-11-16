@@ -18,6 +18,9 @@ var pista_n := 0
 var giri := 2
 var regole := "base"
 var livello := 1
+var strada := false
+var meteo := false
+var libero := false
 var posti: Array = []        # per pilota: {tipo, uid, nome}
 var codice := ""
 var url := ""
@@ -169,7 +172,7 @@ func preparazione() -> void:
 		preparazione())
 	hc.add_child(bn)
 	vs.add_child(hc)
-	var alt := 250.0 if stanza else 340.0
+	var alt := 170.0 if stanza else 250.0
 	vs.add_child(UI.immagine("res://assets/piste/mini/%s.webp" % pid, Vector2(530, alt)))
 	var curve := 0
 	for c in p.fermate:
@@ -181,10 +184,25 @@ func preparazione() -> void:
 	vs.add_child(_scelta("Regole", [["Base", "base"], ["Avanzate", "avanzate"]], regole, func(x):
 		regole = x
 		preparazione()))
+	vs.add_child(_scelta("Gara", [["In circuito", false], ["Su strada", true]], strada, func(x):
+		strada = x
+		preparazione()))
+	if regole == "avanzate":
+		vs.add_child(_scelta("Meteo", [["Sereno", false], ["Dado nero", true]], meteo, func(x):
+			meteo = x
+			preparazione()))
+		if not strada:
+			vs.add_child(_scelta("Assetto", [["Uguale", false], ["Libero", true]], libero, func(x):
+				libero = x
+				preparazione()))
 	vs.add_child(_scelta("Computer", [["Prudente", 0], ["Normale", 1], ["Esperto", 2]], livello, func(x):
 		livello = x
 		preparazione()))
 	var nota := "Base: 18 Punti Struttura per tutto. Avanzate: gomme, freni, cambio, carrozzeria, motore, tenuta di strada, scie e detriti."
+	if strada:
+		nota = "Su strada: niente box, Nitro una volta per giro, controllo al traguardo." + (" Ogni pilota ha la sua auto e un'abilità." if regole == "avanzate" else "")
+	elif regole == "avanzate" and (meteo or libero):
+		nota = ("Il dado nero decide il tempo e si scelgono le gomme. " if meteo else "") + ("Ognuno ripartisce 20 punti fra le zone." if libero else "")
 	vs.add_child(UI.testo(nota, 20, UI.GRIGIO, false, 520))
 	if stanza:
 		var hq := UI.riga(14)
@@ -314,11 +332,14 @@ func _via() -> void:
 			lista.append({"nome": str(pz.nome).left(16), "pilota": i, "tipo": "remoto", "uid": pz.uid})
 	if lista.is_empty():
 		return
-	via.emit({"regole": regole, "pista": Dati.PISTE[pista_n], "giri": giri, "auto": lista, "livello": livello, "stanza": stanza})
+	var av := regole == "avanzate"
+	via.emit({"regole": regole, "pista": Dati.PISTE[pista_n], "giri": giri, "auto": lista, "livello": livello, "stanza": stanza,
+		"opzioni": {"strada": strada, "meteo": av and meteo, "libero": av and libero and not strada}})
 
 ## Per i telefoni in sala d'attesa.
 func vista_attesa() -> Dictionary:
 	var l := []
 	for i in posti.size():
 		l.append({"p": i, "tp": posti[i].tipo, "u": posti[i].uid, "n": posti[i].nome})
-	return {"fase": "attesa", "pista": Dati.PISTE[pista_n], "giri": giri, "regole": regole, "posti": l}
+	return {"fase": "attesa", "pista": Dati.PISTE[pista_n], "giri": giri, "regole": regole, "posti": l, "str": strada,
+		"mon": regole == "avanzate" and meteo, "lib": regole == "avanzate" and libero and not strada}

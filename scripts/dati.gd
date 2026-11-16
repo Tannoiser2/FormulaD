@@ -43,6 +43,50 @@ const ZONE := {
 	],
 }
 const NOMI_REGOLE := {"base": "Regole base", "avanzate": "Regole avanzate"}
+
+## Assetto libero: 20 punti da ripartire, con questi limiti per zona.
+const ASSETTO_TOTALE := 20
+const ASSETTO_MIN := 1
+## L'assetto che usa il computer quando la ripartizione è libera.
+const ASSETTO_IA := {"gomme": 8, "freni": 3, "cambio": 2, "carrozzeria": 3, "motore": 2, "tenuta": 2}
+
+## Gomme (regola facoltativa con il meteo).
+const GOMME := ["dure", "morbide", "pioggia"]
+const NOMI_GOMME := {"dure": "Dure", "morbide": "Morbide", "pioggia": "Da pioggia"}
+const DESCR_GOMME := {
+	"dure": "Asciutto: nessun effetto. Pioggia: +3 caselle quando la mossa tocca una curva.",
+	"morbide": "Asciutto: +1 casella facoltativa (solo il primo giro), lungo in curva costa il doppio. Pioggia: +3 in curva.",
+	"pioggia": "Pioggia: +1 casella quando la mossa tocca una curva. Asciutto: lungo in curva costa il doppio.",
+}
+
+## Meteo: 0 bello (fisso), 1 variabile (asciutto), 2 pioggia variabile, 3 pioggia (fissa).
+const NOMI_METEO := ["Bel tempo", "Variabile", "Pioggia (variabile)", "Pioggia"]
+## Tabella del meteo: dado nero fino al primo numero pioggia, fino al secondo variabile, oltre bel tempo.
+const TABELLA_METEO := [7, 12]
+
+## Gare su strada con le regole avanzate: l'auto di ogni pilota (gomme, freni, cambio, carrozzeria, motore, tenuta).
+const AUTO_STRADA := {
+	"litsu": [7, 3, 2, 2, 3, 3], "jack": [9, 2, 2, 2, 3, 2], "julien": [8, 4, 2, 2, 3, 2], "jenny": [4, 6, 2, 3, 3, 2],
+	"derek": [6, 3, 2, 4, 3, 3], "diane": [6, 4, 2, 3, 3, 3], "stanley": [7, 2, 3, 2, 3, 3], "temana": [6, 3, 3, 3, 3, 3],
+	"dimitri": [5, 4, 3, 3, 3, 4], "montoya": [5, 5, 3, 2, 3, 2],
+}
+const ABILITA := {
+	"litsu": ["Che dolcezza!", "Chi taglia il traguardo mentre lei è in gara avanza di una casella in meno."],
+	"jack": ["Re della derapata", "In ogni curva può allungare o accorciare la mossa di una casella, pagando 1 Gomme."],
+	"julien": ["Rana della pioggia", "Ritira il dado del meteo quando dice pioggia; sotto la pioggia in curva scivola di 1 casella invece di 3."],
+	"jenny": ["Meccanica esperta", "Al traguardo recupera 4 punti invece di 2."],
+	"derek": ["Aggressivo", "Chi collide con lui tira il dado nero due volte."],
+	"diane": ["Scatto bruciante", "A parità di posizione muove sempre per prima, anche in griglia."],
+	"stanley": ["Autoradio", "Una volta per gara lancia la radio contro un'auto accanto: il dado nero dice quale zona perde 1 punto."],
+	"temana": ["Rottame", "Una volta per giro lascia un segnalino detriti dove parte; sui detriti perde Tenuta solo con 1 o 2."],
+	"dimitri": ["Piccolo genio", "Motore sotto sforzo: perde Motore solo con 1-3 (1-2 se piove)."],
+	"montoya": ["Nitro migliore", "Quando usa il Nitro può avanzare di 3 caselle in più."],
+}
+## Autoradio di Stanley: dado nero fino a ... -> zona.
+const RADIO := [[4, "gomme"], [7, "freni"], [10, "cambio"], [13, "carrozzeria"], [17, "motore"], [20, "tenuta"]]
+
+static func zone_ids() -> Array:
+	return ["gomme", "freni", "cambio", "carrozzeria", "motore", "tenuta"]
 const COLORI_ZONE := {"ps": Color(0.95, 0.8, 0.1), "gomme": Color(0.25, 0.2, 0.7), "freni": Color(0.5, 0.75, 0.1),
 	"cambio": Color(0.1, 0.6, 0.6), "carrozzeria": Color(0.9, 0.6, 0.1), "motore": Color(0.85, 0.15, 0.1), "tenuta": Color(0.6, 0.2, 0.7)}
 
@@ -129,4 +173,26 @@ const REGOLE_IN_BREVE := """[b]Scopo[/b] - Tagliare per primi il traguardo dopo 
 - Detriti: ogni punto Carrozzeria o Motore perso (e ogni auto eliminata) lascia un segnalino sulla casella. Chi ci passa sopra tira il dado nero: da 1 a 4 perde 1 Tenuta di strada.
 - Scia: chi finisce tutto il tiro esattamente dietro un'auto, entrambe in 4a o più e chi segue con marcia uguale o più alta, può avanzare di altre 3 caselle. Se la scia porta dentro una curva costa 1 Freni.
 - Box: si recuperano tutte le Gomme. Dado nero: da 1 a 10 sosta rapida, si riparte subito in 4a per metà del tiro (arrotondata per eccesso); da 11 a 20 si aspetta il turno dopo.
-- A 0 di Carrozzeria, Motore o Tenuta di strada l'auto è eliminata."""
+- A 0 di Carrozzeria, Motore o Tenuta di strada l'auto è eliminata.
+
+[b]Assetto libero[/b] (regole avanzate) - Prima del via ognuno ripartisce 20 punti fra le sei zone: Gomme da 1 a 14, le altre da 1 a 7.
+
+[b]Meteo e gomme[/b] (regole avanzate) - Prima del via il dado nero decide il tempo: da 1 a 7 pioggia, da 8 a 12 variabile, da 13 a 20 bel tempo. Con il tempo variabile, ogni volta che esce 20 in 5a o 30 in 6a si ritira: bel tempo fa migliorare, pioggia fa peggiorare.
+- Sotto la pioggia: collisione con 1 o 2, motore sotto sforzo da 1 a 3, detriti da 1 a 5.
+- Gomme dure: con la pioggia, quando la mossa tocca una curva, si avanza di 3 caselle in più.
+- Gomme morbide: all'asciutto si può avanzare di 1 casella in più, ma andare lungo costa il doppio delle Gomme. Dopo un giro senza cambiarle il vantaggio sparisce, dopo due giri andare lungo costa il triplo. Con la pioggia, +3 in curva.
+- Gomme da pioggia: con la pioggia +1 casella quando la mossa tocca una curva; all'asciutto andare lungo costa il doppio (il triplo dopo due giri).
+- Al box si possono cambiare le gomme.
+
+[b]Gara su strada[/b] - Niente box. Una volta per giro, dopo il tiro, si può usare il Nitro: si avanza di tante caselle in più quante il numero della marcia, e vanno fatte tutte. Al traguardo (punto di controllo), con le regole base si recuperano 10 PS fino a 18; con le avanzate si recuperano tutte le Gomme e 2 punti nelle zone più rovinate.
+Con le regole avanzate ogni pilota guida la sua auto, solo con gomme dure, e ha un'abilità:
+- Li Tsu Sin: chi taglia il traguardo mentre lei è in gara avanza di una casella in meno.
+- Jack Owens: in curva può allungare o accorciare la mossa di 1 casella, pagando 1 Gomme.
+- Julien Marcellin: ritira il dado del meteo quando dice pioggia; sotto la pioggia in curva scivola di 1 invece di 3.
+- Jenny Slivers: al traguardo recupera 4 punti invece di 2.
+- Derek Manson: chi collide con lui tira il dado nero due volte.
+- Diane Montfort: a parità di posizione muove sempre per prima.
+- Stanley Washington: una volta per gara lancia la radio contro un'auto accanto (il dado nero dice quale zona perde 1 punto).
+- Temana Matahi: una volta per giro lascia detriti dove parte; sui detriti perde Tenuta solo con 1 o 2.
+- Dimitri Tzarof: motore sotto sforzo solo con 1-3 (1-2 se piove).
+- Montoya Cadena: con il Nitro può avanzare di 3 caselle in più."""

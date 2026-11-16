@@ -39,7 +39,7 @@ tv.setDefaultTimeout(180000);
 ascolta(tv, 'TV');
 async function foto(p, f) { try { await p.screenshot({ path: `${out}/${f}.png`, timeout: 120000 }); } catch (e) { console.log('foto non riuscita', f); } }
 const quanti = NT + (OSPITE ? 1 : 0);
-await tv.goto(`http://localhost:8765/index.html?rete=locale&subito&veloce=3&stanza=${quanti}&regole=${process.env.REGOLE || 'avanzate'}`);
+await tv.goto(`http://localhost:8765/index.html?rete=locale&subito&veloce=3&stanza=${quanti}&regole=${process.env.REGOLE || 'avanzate'}${process.env.OPZ || ''}`);
 let codice = '';
 for (let i = 0; i < 240 && !codice; i++) {
   await tv.waitForTimeout(1000);
@@ -71,6 +71,7 @@ if (OSPITE) {
   await osp.goto(`http://localhost:8765/index.html?rete=locale&subito&s=${codice}&nome=Ospite&autoguida=1`);
 }
 const t0 = Date.now();
+let fotoAssetto = false;
 let fatte = 0, fotoMarcia = false, fotoMossa = false, fotoOspite = 0, fine = false, fotoAnte = 0;
 while (Date.now() - t0 < DURATA && !fine) {
   await tv.waitForTimeout(700);
@@ -80,7 +81,15 @@ while (Date.now() - t0 < DURATA && !fine) {
     if (!s) continue;
     if (s.fase === 'fine') { fine = true; break; }
     if (!s.att || !s.tocca) continue;
-    if (s.att.tipo === 'marcia') {
+    if (s.att.tipo === 'assetto') {
+      // tocchi veri: un punto spostato (se l'assetto è libero), le gomme, poi conferma
+      if (s.att.libero) { await p.click('[data-z="tenuta"][data-d="-1"]'); await p.click('[data-z="gomme"][data-d="1"]'); }
+      const g = p.locator('[data-g]');
+      if (await g.count()) await g.last().click();
+      if (!fotoAssetto) { await foto(p, `tel_1_assetto${s.att.box ? '_box' : ''}`); fotoAssetto = true; }
+      await p.click('#oka');
+      fatte++;
+    } else if (s.att.tipo === 'marcia') {
       if (!fotoMarcia && fatte > 2) { await foto(p, 'tel_2_marcia'); await foto(tv, 'tv_3_attesa_telefono'); fotoMarcia = true; }
       // la marcia più alta che non costa nulla, ma non oltre la 4a
       const ok = s.att.marce.filter((o) => !o.fuori && Object.keys(o.costo).length === 0 && o.m <= 4);

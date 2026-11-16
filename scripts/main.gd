@@ -59,6 +59,9 @@ func _ready() -> void:
 		menu.pista_n = int(par.get("pista_n", 0))
 		menu.regole = str(par.get("regole", "avanzate"))
 		menu.giri = int(par.get("giri", 1))
+		menu.strada = par.has("strada")
+		menu.meteo = par.has("meteo")
+		menu.libero = par.has("libero")
 		menu._voce("stanza")
 	elif par.has("s"):
 		# aperto con il codice di una stanza: entra come ospite
@@ -70,7 +73,8 @@ func _ready() -> void:
 		for i in int(par.get("bot", 6)):
 			lista.append({"nome": Dati.PILOTI[i].nome, "pilota": i, "tipo": "ia", "uid": ""})
 		_via({"regole": str(par.get("regole", "avanzate")), "pista": str(par.get("pista", "FDMonaco")), "giri": int(par.get("giri", 1)),
-			"auto": lista, "livello": 1, "stanza": false})
+			"auto": lista, "livello": 1, "stanza": false,
+			"opzioni": {"strada": par.has("strada"), "meteo": par.has("meteo"), "libero": par.has("libero")}})
 
 # ------------------------------------------------------------------ comandi
 
@@ -579,6 +583,12 @@ func _ciclo_ospite() -> void:
 
 ## Prove: l'ospite sceglie la marcia più alta che non costa (fino alla 4a) e la casella meno cara e più lontana.
 func _guida_da_solo(att: Dictionary) -> void:
+	if str(att.tipo) == "assetto":
+		var az := {"t": "assetto", "g": str(att.gomme[att.gomme.size() - 1])}
+		if att.libero:
+			az["pf"] = Dati.ASSETTO_IA.duplicate()
+		_decisione(az)
+		return
 	if str(att.tipo) == "marcia":
 		var m := int(att.marce[0].m)
 		for o in att.marce:

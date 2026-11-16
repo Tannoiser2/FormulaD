@@ -41,8 +41,8 @@ Se un pilota da telefono si è distratto, chi ospita può premere **Decidi tu al
 
 ## Le regole seguite
 
-Sono quelle dei due regolamenti del gioco (base e avanzato), come le applica il modulo «Formula D: Scripted», senza le
-regole opzionali (meteo, scelta delle gomme, auto personalizzate). In breve:
+Sono quelle dei due regolamenti del gioco (base e avanzato), come le applica il modulo «Formula D: Scripted», più alcune
+regole facoltative che si accendono nella preparazione della gara (vedi sotto). In breve:
 
 - marce 1a 1-2, 2a 2-4, 3a 4-8, 4a 7-12, 5a 11-20, 6a 21-30; si sale di una, si scala di una gratis e fino a tre
   saltate pagando;
@@ -56,6 +56,21 @@ regole opzionali (meteo, scelta delle gomme, auto personalizzate). In breve:
 - box tra un giro e l'altro: corsia senza frenate, scalate, collisioni né sforzo; si riparte al massimo in 4a;
 - avanzate: sei zone (Gomme 6, Freni 3, Cambio 3, Carrozzeria 3, Motore 3, Tenuta 2), testacoda, scie, detriti,
   sosta rapida o lenta.
+
+### Regole facoltative
+
+- **Assetto libero** (avanzate, in circuito): prima del via ognuno ripartisce 20 punti fra le zone (Gomme 1-14,
+  le altre 1-7). Il computer usa un assetto prudente.
+- **Meteo** (avanzate): il dado nero decide il tempo al via (bel tempo, variabile, pioggia) e cambia con i motori
+  sotto sforzo. Si scelgono le gomme dure, morbide o da pioggia, e al box si possono cambiare. Con la pioggia
+  collisioni, sforzo e detriti sono più probabili.
+- **Gara su strada** (base e avanzate): niente box, **Nitro** una volta per giro (si aggiungono tante caselle quanto
+  la marcia), controllo al traguardo che rende qualche punto. Con le avanzate ogni pilota ha la sua auto e un'abilità.
+
+Semplificazioni: la radio di Stanley e i detriti di Temana sono automatici; i punti del controllo vanno da soli alle
+zone più danneggiate; niente sosta tecnica né giro di qualifica (la griglia la decide il dado nero); una sola tabella
+del meteo per tutti i circuiti. I circuiti cittadini con le loro zone speciali (polizia, tunnel...) non ci sono ancora:
+la gara su strada si corre sui circuiti presenti.
 
 Il riepilogo completo è nel gioco (pulsante **Regole**) e in `scripts/dati.gd`.
 
