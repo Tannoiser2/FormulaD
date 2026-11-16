@@ -38,7 +38,8 @@ Si gioca qui: **https://tannoiser2.github.io/FormulaD/**
    plancia), dadi, scelte del turno e plancia, dove si sceglie la marcia. In alto a sinistra la cronaca, che si può
    nascondere. La preparazione dell'auto (assetto e gomme) si fa in una finestra al centro.
 5. Le caselle raggiungibili sono colorate (verde libera, giallo costa punti...) con sopra l'icona della zona che si
-   rovina e quanti punti si perdono; il pulsante «Sulle caselle» passa alle parole (Gomme 2, Freni 1...).
+   rovina e quanti punti si perdono; il pulsante «Scritte» in alto passa alle parole (Gomme 2, Freni 1...). Un clic su una casella mostra
+   quanto si avanza e quanto costa, un secondo clic sulla stessa casella conferma la mossa.
 6. A fine gara **Rivedi la gara** fa il replay di tutta la corsa: in ogni turno le auto si muovono insieme, ognuna
    alla sua velocità, senza pause fra un turno e l'altro (si può rallentare, accelerare o interrompere).
 

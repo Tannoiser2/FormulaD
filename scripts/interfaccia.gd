@@ -25,6 +25,7 @@ var p_sx: PanelContainer
 var col_dx: VBoxContainer
 var b_mappa: Button
 var b_cronaca: Button
+var b_scritte: Button
 var titolo_ordine: Label
 var p_ass: PanelContainer
 var ass_box: VBoxContainer
@@ -70,12 +71,14 @@ func _ready() -> void:
 	barra_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	barra_info.clip_text = true
 	hb.add_child(barra_info)
-	for b in [["Telecamera: segue", "segui"], ["Vista intera", "vista"], ["Caselle", "mappa"], ["Regole", "regole"], ["Menu", "menu"]]:
+	for b in [["Telecamera: segue", "segui"], ["Vista intera", "vista"], ["Caselle", "mappa"], ["Scritte: icone", "scritte"], ["Regole", "regole"], ["Menu", "menu"]]:
 		var bt := UI.bottone(b[0], 22, UI.FONDO2, 96, 44)
 		bt.pressed.connect(func(): comando.emit(b[1]))
 		hb.add_child(bt)
 		if b[1] == "mappa":
 			b_mappa = bt
+		if b[1] == "scritte":
+			b_scritte = bt
 		if b[1] == "segui":
 			b_segui = bt
 			bt.custom_minimum_size.x = 190
@@ -417,28 +420,7 @@ func chiedi() -> void:
 		return
 	if v.att.tipo == "mossa":
 		azione.add_child(UI.testo("%s: tiro %d in %s" % [a.n, int(v.att.tiro), Dati.NOMI_MARCE[int(a.m)]], 32, col, true))
-		azione.add_child(UI.testo("Tocca sul tabellone una casella colorata, poi conferma.", 22, UI.CHIARO, false, LARG_DX - 40))
-		var h := HFlowContainer.new()
-		h.add_theme_constant_override("h_separation", 8)
-		h.add_theme_constant_override("v_separation", 4)
-		h.custom_minimum_size.x = LARG_DX - 40
-		for l in [[Mondo.COL_LIBERA, "libera"], [Mondo.COL_COSTO, "costa punti"], [Mondo.COL_TESTA, "testacoda"], [Mondo.COL_FUORI, "ritiro"],
-				[Mondo.COL_BOX, "box"], [Mondo.COL_ARRIVO, "traguardo"]]:
-			h.add_child(UI.chip(l[0], Vector2(20, 20)))
-			h.add_child(UI.testo(l[1], 18, UI.GRIGIO))
-		var bs := UI.bottone("Sulle caselle: parole" if scritte_icone.call() else "Sulle caselle: icone", 18, UI.FONDO2, 190, 34)
-		bs.pressed.connect(func(): comando.emit("scritte"))
-		h.add_child(UI.spazio(6))
-		h.add_child(bs)
-		azione.add_child(h)
-		var con_extra := false
-		for o in v.att.opz:
-			con_extra = con_extra or Mondo.opzione_extra(o)
-		if con_extra:
-			var h2 := UI.riga(10)
-			h2.add_child(UI.chip(Mondo.COL_EXTRA, Vector2(20, 20)))
-			h2.add_child(UI.testo("bordo azzurro: casella in più facoltativa (scia, Nitro, gomme morbide)", 18, UI.GRIGIO, false, LARG_DX - 80))
-			azione.add_child(h2)
+		azione.add_child(UI.testo("Clicca una casella per vedere quanto avanzi e quanto costa, riclicca per confermare.", 22, UI.CHIARO, false, LARG_DX - 40))
 
 ## La riga sotto la plancia mentre si sceglie la marcia.
 func _info_marcia() -> void:
@@ -609,13 +591,8 @@ func scegli_opzione(o: Dictionary) -> void:
 		return
 	chiedi()
 	opz_scelta = o
-	var male: bool = str(o.fu) != "" or o.te
-	azione.add_child(UI.testo(testo_opzione(v.regole, o), 26, UI.ROSSO.lightened(0.3) if male else UI.GIALLO, false, LARG_DX - 40))
-	var b := UI.bottone("CONFERMA", 32, Color(0.1, 0.6, 0.2) if not male else UI.ROSSO, 300, 60)
-	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var cid: String = o.c
-	b.pressed.connect(func(): decisione.emit({"t": "mossa", "c": cid}))
-	azione.add_child(b)
+	# il testo nel colore della casella: quanto si avanza e quanto costa
+	azione.add_child(UI.testo(testo_opzione(v.regole, o), 26, Mondo.colore_opzione(o).lightened(0.25), false, LARG_DX - 40))
 
 # ------------------------------------------------------------------ finestre
 

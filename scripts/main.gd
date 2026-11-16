@@ -54,6 +54,7 @@ func _ready() -> void:
 	mondo.segui = rete.carica("fd_segui") != "0"
 	mondo.scritte_icone = rete.carica("fd_scritte") != "parole"
 	hud.scritte_icone = func() -> bool: return mondo.scritte_icone
+	hud.b_scritte.text = "Scritte: icone" if mondo.scritte_icone else "Scritte: parole"
 	hud.segna_segui(mondo.segui)
 	menu.principale()
 	if rete.web and not menu.ha_salvataggio:
@@ -122,7 +123,7 @@ func _comando(cosa: String) -> void:
 		"scritte":
 			mondo.cambia_scritte()
 			rete.salva("fd_scritte", "icone" if mondo.scritte_icone else "parole")
-			hud.chiedi()
+			hud.b_scritte.text = "Scritte: icone" if mondo.scritte_icone else "Scritte: parole"
 		"mappa":
 			var acceso: bool = mondo.mappa == null
 			mondo.mostra_mappa(acceso)
