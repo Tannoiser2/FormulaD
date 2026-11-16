@@ -23,6 +23,7 @@ var p_dado: PanelContainer
 var dado_box: HBoxContainer
 var p_sx: PanelContainer
 var col_dx: VBoxContainer
+var b_mappa: Button
 var finestra: Control
 const LARG_DX := 540.0
 var p_cron: PanelContainer
@@ -63,10 +64,12 @@ func _ready() -> void:
 	barra_info.clip_text = true
 	hb.add_child(barra_info)
 	for b in [["Telecamera: segue", "segui"], ["< Gira", "gira_sx"], ["Gira >", "gira_dx"], ["Inclina", "inclina"],
-			["Vista intera", "vista"], ["Regole", "regole"], ["Menu", "menu"]]:
+			["Vista intera", "vista"], ["Caselle", "mappa"], ["Regole", "regole"], ["Menu", "menu"]]:
 		var bt := UI.bottone(b[0], 22, UI.FONDO2, 96, 44)
 		bt.pressed.connect(func(): comando.emit(b[1]))
 		hb.add_child(bt)
+		if b[1] == "mappa":
+			b_mappa = bt
 		if b[1] == "segui":
 			b_segui = bt
 			bt.custom_minimum_size.x = 190
@@ -171,7 +174,11 @@ func aggiorna(vista: Dictionary, mie: Array) -> void:
 	miei = mie
 	marcia_vista = 0
 	var p := Pista.carica(v.pista)
-	barra_titolo.text = p.nome.to_upper()
+	# «Formula Dé 19: Suzuka» -> «SUZUKA»: nella barra basta il nome del circuito
+	var nome: String = p.nome
+	if nome.contains(": "):
+		nome = nome.get_slice(": ", 1)
+	barra_titolo.text = nome.to_upper()
 	var giro_max := 0
 	for a in v.auto:
 		giro_max = max(giro_max, int(a.g))

@@ -45,6 +45,10 @@ func _ready() -> void:
 	menu.in_rete = rete.web
 	mondo.sopra_ui = func(p): return menu.visible or hud.sopra(p)
 	mondo.casella_toccata.connect(_casella)
+	mondo.casella_mappa.connect(func(cid: String):
+		var c = mondo.pista.per_id[cid]
+		hud.cronaca("Casella %s (corsia %s): porta a %s" % [cid, ["box", "destra", "centro", "sinistra"][int(c.l)] if int(c.l) <= 3 else str(c.l),
+			", ".join(PackedStringArray(c.get("n", [])))], "info"))
 	mondo.carica_pista(Pista.carica("FDMonaco"))
 	menu.ha_salvataggio = rete.carica("fd_gara") != ""
 	mondo.segui = rete.carica("fd_segui") != "0"
@@ -113,6 +117,12 @@ func _comando(cosa: String) -> void:
 				_solo_velo()
 		"vista":
 			mondo.vista_generale()
+		"mappa":
+			var acceso: bool = mondo.mappa == null
+			mondo.mostra_mappa(acceso)
+			hud.b_mappa.text = "Caselle: sì" if acceso else "Caselle"
+			if acceso:
+				hud.cronaca("Mappatura delle caselle: bordo blu corsia di destra, verde centro, arancio sinistra; linee bianche avanti, rosse cambio corsia. Tocca una casella per vederne la sigla e dove porta.", "info")
 		"gira_sx":
 			mondo.gira(-PI / 6.0)
 		"gira_dx":

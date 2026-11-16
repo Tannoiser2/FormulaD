@@ -4,6 +4,7 @@ extends Node3D
 ## La visuale si sposta, si avvicina e ruota con il mouse e con le dita (iPad).
 
 signal casella_toccata(cid: String)
+signal casella_mappa(cid: String)   # con la mappatura accesa: la casella toccata, per vederne i collegamenti
 
 const SCALA := 0.01          # 1 pixel del tabellone = 1 cm
 const COL_LIBERA := Color(0.15, 0.95, 0.3)
@@ -87,6 +88,8 @@ func pos_casella(cid: String) -> Vector3:
 	return mondo_da(pista.pos(cid))
 
 func carica_pista(p: Pista) -> void:
+	if mappa != null:
+		mostra_mappa(false)
 	pista = p
 	for k in auto:
 		auto[k].queue_free()
@@ -485,7 +488,7 @@ func inclina() -> void:
 	tw.tween_property(self, "inclinazione", prossima, 0.3)
 
 func _tocco(p: Vector2) -> void:
-	if opzioni.is_empty() or cam == null:
+	if cam == null or (opzioni.is_empty() and mappa == null):
 		return
 	var o := cam.project_ray_origin(p)
 	var d := cam.project_ray_normal(p)
@@ -504,6 +507,16 @@ func _tocco(p: Vector2) -> void:
 			best = cid
 	if best != "":
 		casella_toccata.emit(best)
+		return
+	if mappa != null:
+		for c in pista.caselle:
+			var dd := pos_casella(c.id).distance_to(q)
+			if dd < bd:
+				bd = dd
+				best = c.id
+		if best != "":
+			segna_mappa(best)
+			casella_mappa.emit(best)
 
 func _unhandled_input(ev: InputEvent) -> void:
 	if pista == null:
@@ -663,3 +676,95 @@ func replay(storia: Dictionary, lista: Array) -> void:
 
 func ferma_replay() -> void:
 	_replay_stop = true
+
+# ------------------------------------------------------------------ mappatura delle caselle
+
+var mappa: MeshInstance3D            # tutte le caselle con i loro collegamenti (per controllare i circuiti)
+var _mappa_sigle: Array = []
+const COL_CORSIA := {1: Color(0.2, 0.55, 1.0), 2: Color(0.15, 0.85, 0.3), 3: Color(1.0, 0.55, 0.1), 0: Color(0.85, 0.3, 0.9)}
+
+## Accende o spegne la mappatura: ogni casella con il bordo del colore della sua corsia (blu a destra, verde al centro,
+## arancio a sinistra, viola i box), linee bianche verso la casella davanti, rosse verso le corsie accanto.
+func mostra_mappa(si: bool) -> void:
+	if mappa != null:
+		mappa.queue_free()
+		mappa = null
+	_togli_sigle()
+	if not si or pista == null:
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var lungo: float = pista.cella * SCALA * 0.92
+	var largo: float = pista.largo_cella * SCALA * 0.9
+	var h := 0.035
+	for c in pista.caselle:
+		var p := pos_casella(c.id) + Vector3(0, h, 0)
+		var a := -deg_to_rad(float(c.r))
+		var ax := Vector3(cos(a), 0, -sin(a)) * lungo * 0.5
+		var az := Vector3(sin(a), 0, cos(a)) * largo * 0.5
+		var col: Color = COL_CORSIA.get(int(c.l), Color.WHITE)
+		var k := [p - ax - az, p + ax - az, p + ax + az, p - ax + az]
+		for j in 4:
+			_segmento(st, k[j], k[(j + 1) % 4], 0.012, col)
+		# freccette verso le caselle collegate
+		for nid in c.get("n", []):
+			var q := pos_casella(nid) + Vector3(0, h + 0.003, 0)
+			var stessa: bool = pista.per_id[nid].l == c.l
+			var cl := Color(1, 1, 1, 0.9) if stessa else Color(1, 0.2, 0.2, 0.95)
+			var fine := p.lerp(q, 0.82)
+			_segmento(st, p, fine, 0.008 if stessa else 0.01, cl)
+			var dir := (q - p).normalized()
+			var lat := dir.cross(Vector3.UP) * 0.035
+			_triangolo(st, fine + dir * 0.06, fine + lat, fine - lat, cl)
+		_quadratino(st, p, 0.035, col)
+	mappa = MeshInstance3D.new()
+	mappa.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.vertex_color_use_as_albedo = true
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.no_depth_test = true
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.render_priority = 2
+	mappa.material_override = m
+	add_child(mappa)
+
+func _segmento(st: SurfaceTool, a: Vector3, b: Vector3, w: float, col: Color) -> void:
+	var lat := (b - a).cross(Vector3.UP).normalized() * w
+	_triangolo(st, a - lat, b - lat, b + lat, col)
+	_triangolo(st, a - lat, b + lat, a + lat, col)
+
+func _triangolo(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, col: Color) -> void:
+	for v in [a, b, c]:
+		st.set_color(col)
+		st.add_vertex(v)
+
+func _quadratino(st: SurfaceTool, p: Vector3, r: float, col: Color) -> void:
+	_triangolo(st, p + Vector3(-r, 0, -r), p + Vector3(r, 0, -r), p + Vector3(r, 0, r), col)
+	_triangolo(st, p + Vector3(-r, 0, -r), p + Vector3(r, 0, r), p + Vector3(-r, 0, r), col)
+
+func _togli_sigle() -> void:
+	for l in _mappa_sigle:
+		l.queue_free()
+	_mappa_sigle.clear()
+
+## Scrive la sigla della casella toccata e di quelle dove porta.
+func segna_mappa(cid: String) -> void:
+	_togli_sigle()
+	var lista: Array = [cid] + Array(pista.per_id[cid].get("n", []))
+	for k in lista.size():
+		var l := Label3D.new()
+		l.text = str(lista[k])
+		l.font = font
+		l.font_size = 40
+		l.pixel_size = 0.003
+		l.modulate = Color(1, 1, 0.3) if k == 0 else Color.WHITE
+		l.outline_size = 12
+		l.outline_modulate = Color.BLACK
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.no_depth_test = true
+		l.render_priority = 5
+		l.outline_render_priority = 4
+		l.position = pos_casella(lista[k]) + Vector3(0, 0.08, 0)
+		add_child(l)
+		_mappa_sigle.append(l)
