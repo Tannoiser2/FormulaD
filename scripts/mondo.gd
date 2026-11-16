@@ -43,6 +43,7 @@ var sopra_ui: Callable
 
 ## false: la telecamera resta dove l'ha messa il giocatore e non insegue le mosse
 var segui := true
+var pannelli: Control   # l'interfaccia: la sua colonna a destra copre il tabellone, il centro della vista si sposta a sinistra
 
 func _ready() -> void:
 	font = load("res://assets/font/BarlowCondensed-Bold.ttf")
@@ -353,6 +354,12 @@ func _process(d: float) -> void:
 	var dir := Vector3(sin(imbardata) * cos(inclinazione), sin(inclinazione), cos(imbardata) * cos(inclinazione))
 	cam.position = bersaglio + dir * distanza
 	cam.look_at(bersaglio, Vector3.UP)
+	var vis := get_viewport().get_visible_rect().size
+	var largo: float = 2.0 * distanza * tan(deg_to_rad(cam.fov) * 0.5) * vis.x / max(vis.y, 1.0)
+	var margine := 0.0
+	if pannelli != null and pannelli.visible and pannelli.col_dx != null:
+		margine = Interfaccia.LARG_DX + 20.0
+	cam.h_offset = largo * margine / max(vis.x, 1.0) * 0.5
 
 ## Gesti con due dita (iPad): pizzico = avvicina/allontana, dita che girano = ruota il tabellone,
 ## dita che scorrono insieme in verticale = inclina, in orizzontale = ruota.
@@ -496,3 +503,98 @@ func _unhandled_input(ev: InputEvent) -> void:
 		_zoom(1.0 / ev.factor)
 	elif ev is InputEventPanGesture:
 		_sposta(-ev.delta * 12.0)
+
+# ------------------------------------------------------------------ replay
+
+var replay_attivo := false
+var replay_tempo := 1.0       # secondi per turno
+var replay_turno := 0
+var _replay_stop := false
+
+## Rivede tutta la gara: in ogni turno tutte le auto si muovono insieme, ognuna alla sua velocità
+## (chi fa più caselle va più svelta), e un turno scorre nell'altro senza fermarsi.
+## `auto` è la lista delle auto [{i, p, n}].
+func replay(storia: Dictionary, lista: Array) -> void:
+	replay_attivo = true
+	_replay_stop = false
+	togli_opzioni()
+	# per ogni auto: in ogni turno il percorso fatto (le caselle) e il turno in cui lascia la pista
+	var turni := {}
+	var esce := {}
+	var ultimo := 1
+	for v in storia.mosse:
+		var i := int(v.a)
+		var tr := int(v.tr)
+		ultimo = max(ultimo, tr)
+		if v.has("x"):
+			esce[i] = tr
+			continue
+		if not turni.has(i):
+			turni[i] = {}
+		var p: Array = turni[i].get(tr, [])
+		for cid in v.p:
+			if p.is_empty() or p[-1] != cid:
+				p.append(cid)
+		turni[i][tr] = p
+	for a in lista:
+		var i := int(a.i)
+		metti_auto(i, int(a.p), str(a.n), str(storia.via.get(str(i), "")))
+	var fatto := {}          # caselle percorse da ogni auto (per sapere chi è in testa)
+	var t := 1.0
+	while t < ultimo + 1.0 and not _replay_stop:
+		var d := get_process_delta_time()
+		t += d / replay_tempo
+		replay_turno = min(int(t), ultimo)
+		var k := int(t)
+		var f := t - k
+		var testa := -1
+		var testa_n := -1.0
+		for a in lista:
+			var i := int(a.i)
+			if not auto.has(i):
+				continue
+			var n: Node3D = auto[i]
+			if esce.has(i) and k > int(esce[i]):
+				n.visible = false
+				continue
+			# il percorso del turno in corso, oppure resta dov'è
+			var p: Array = turni.get(i, {}).get(k, [])
+			var prima := 0
+			for kk in turni.get(i, {}):
+				if int(kk) < k:
+					prima += turni[i][kk].size() - 1
+			if p.size() >= 2:
+				var x: float = f * (p.size() - 1)
+				var j: int = min(int(x), p.size() - 2)
+				var u: float = x - j
+				var a0 := pos_casella(p[j])
+				var a1 := pos_casella(p[j + 1])
+				n.position = a0.lerp(a1, u)
+				n.rotation.y = lerp_angle(_angolo(p[j]), _angolo(p[j + 1]), u)
+				fatto[i] = prima + x
+			else:
+				# fermo: l'ultima casella raggiunta
+				var cid := str(storia.via.get(str(i), ""))
+				var ul := -1
+				for kk in turni.get(i, {}):
+					if int(kk) < k and int(kk) > ul:
+						ul = int(kk)
+				if ul >= 0:
+					cid = turni[i][ul][-1]
+				if cid != "":
+					n.position = pos_casella(cid)
+					n.rotation.y = _angolo(cid)
+				fatto[i] = prima
+			n.visible = true
+			n.scale = Vector3.ONE
+			if float(fatto[i]) > testa_n:
+				testa_n = fatto[i]
+				testa = i
+		if segui and testa >= 0:
+			_bersaglio_t = auto[testa].position
+			_distanza_t = 11.0
+		await get_tree().process_frame
+	replay_attivo = false
+
+func ferma_replay() -> void:
+	_replay_stop = true

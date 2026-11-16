@@ -31,12 +31,14 @@ func _punto(x: float, z: float) -> Vector2:
 		return Vector2((5.0 - x) * PX, (z + 3.03) * PX)
 	return Vector2((5.0 - x) * PX, (3.03 - z) * PX)
 
-func _perno(p: Vector2, s: float, col: Color) -> void:
+## Un perno: `s` è la scala della plancia, `r` quanto è grande rispetto a un foro (la leva del cambio è più grossa).
+func _perno(p: Vector2, s: float, col: Color, r := 1.0) -> void:
 	var c := p * s
-	draw_circle(c + Vector2(1.5, 2.5) * s, 17 * s, Color(0, 0, 0, 0.45))
-	draw_circle(c, 17 * s, Color(0.12, 0.12, 0.14))
-	draw_circle(c, 14 * s, col)
-	draw_circle(c - Vector2(4, 4) * s, 5 * s, Color(1, 1, 1, 0.55))
+	var k := s * r
+	draw_circle(c + Vector2(1.5, 2.5) * k, 21 * k, Color(0, 0, 0, 0.45))
+	draw_circle(c, 21 * k, Color(0.12, 0.12, 0.14))
+	draw_circle(c, 17.5 * k, col)
+	draw_circle(c - Vector2(5, 5) * k, 6 * k, Color(1, 1, 1, 0.55))
 
 func _draw() -> void:
 	var s: float = min(size.x / DIM.x, size.y / DIM.y)
@@ -58,11 +60,11 @@ func _draw() -> void:
 				_perno(_punto(COL_X[n - 1], ROW_Z[RIGHE[zona]]), s, col)
 		if marcia >= 1:
 			var g: Array = LEVA[marcia - 1]
-			_perno(_punto(g[0], g[1]), s * 1.25, Color(0.9, 0.1, 0.1))
+			_perno(_punto(g[0], g[1]), s, Color(0.9, 0.1, 0.1), 1.45)
 	else:
 		var n: int = clamp(int(pf.get("ps", 0)), 0, 18)
 		if n > 0:
 			_perno(_punto(COL_X[(n - 1) % 3], ROW_Z[6 - (n - 1) / 3]), s, Color(0.9, 0.1, 0.1))
 		if marcia >= 1:
 			var g: Array = LEVA[6 - marcia]
-			_perno(_punto(g[0], g[1]), s * 1.25, Color(0.15, 0.15, 0.18))
+			_perno(_punto(g[0], g[1]), s, Color(0.15, 0.15, 0.18), 1.45)

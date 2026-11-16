@@ -21,6 +21,9 @@ var plancia_nome: Label
 var p_dado: PanelContainer
 var dado_box: HBoxContainer
 var p_sx: PanelContainer
+var col_dx: VBoxContainer
+var finestra: Control
+const LARG_DX := 540.0
 var p_cron: PanelContainer
 var barra: PanelContainer
 var velo: Control
@@ -67,30 +70,41 @@ func _ready() -> void:
 			b_segui = bt
 			bt.custom_minimum_size.x = 190
 	hb.add_child(UI.spazio(6))
-	# classifica a sinistra
+	# colonna a destra: ordine di gioco, cronaca, plancia
+	col_dx = UI.colonna(8)
+	col_dx.anchor_left = 1
+	col_dx.anchor_right = 1
+	col_dx.anchor_top = 0
+	col_dx.anchor_bottom = 1
+	col_dx.offset_left = -LARG_DX - 10
+	col_dx.offset_right = -10
+	col_dx.offset_top = 74
+	col_dx.offset_bottom = -10
+	col_dx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(col_dx)
 	p_sx = UI.pannello()
-	p_sx.anchor_left = 0
-	p_sx.anchor_top = 0
-	p_sx.offset_left = 10
-	p_sx.offset_top = 74
-	p_sx.custom_minimum_size = Vector2(470, 0)
-	add_child(p_sx)
+	col_dx.add_child(p_sx)
 	var vs := UI.colonna(4)
 	p_sx.add_child(vs)
 	vs.add_child(UI.testo("ORDINE DI GIOCO", 24, UI.GIALLO, true))
 	lista = UI.colonna(3)
 	vs.add_child(lista)
-	# cronaca in basso a sinistra
+	# cronaca: occupa lo spazio che resta, le righe più vecchie escono in alto
 	p_cron = UI.pannello(UI.FONDO, UI.FONDO2)
-	p_cron.anchor_top = 1
-	p_cron.anchor_bottom = 1
-	p_cron.offset_left = 10
-	p_cron.offset_bottom = -10
-	p_cron.custom_minimum_size = Vector2(470, 0)
-	p_cron.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	add_child(p_cron)
+	p_cron.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col_dx.add_child(p_cron)
+	finestra = Control.new()
+	finestra.clip_contents = true
+	finestra.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	finestra.custom_minimum_size.y = 26
+	p_cron.add_child(finestra)
 	cronaca_box = UI.colonna(2)
-	p_cron.add_child(cronaca_box)
+	cronaca_box.anchor_left = 0
+	cronaca_box.anchor_right = 1
+	cronaca_box.anchor_top = 1
+	cronaca_box.anchor_bottom = 1
+	cronaca_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	finestra.add_child(cronaca_box)
 	# azione in basso al centro
 	p_azione = UI.pannello()
 	p_azione.anchor_left = 0.5
@@ -98,37 +112,28 @@ func _ready() -> void:
 	p_azione.anchor_top = 1
 	p_azione.anchor_bottom = 1
 	p_azione.offset_bottom = -10
+	p_azione.offset_left = -(LARG_DX + 10) / 2.0
+	p_azione.offset_right = -(LARG_DX + 10) / 2.0
 	p_azione.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	p_azione.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	p_azione.custom_minimum_size = Vector2(640, 0)
 	add_child(p_azione)
 	azione = UI.colonna(8)
 	p_azione.add_child(azione)
-	# plancia in basso a destra
+	# plancia in fondo alla colonna
 	p_plancia = UI.pannello(UI.FONDO, UI.FONDO2, 14, 2, 8)
-	p_plancia.anchor_left = 1
-	p_plancia.anchor_right = 1
-	p_plancia.anchor_top = 1
-	p_plancia.anchor_bottom = 1
-	p_plancia.offset_right = -10
-	p_plancia.offset_bottom = -10
-	p_plancia.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	p_plancia.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	add_child(p_plancia)
+	col_dx.add_child(p_plancia)
 	var vp := UI.colonna(4)
 	p_plancia.add_child(vp)
 	plancia_nome = UI.testo("", 24, UI.CHIARO)
 	vp.add_child(plancia_nome)
 	plancia = Plancia.new()
-	plancia.custom_minimum_size = Vector2(430, 260)
+	plancia.custom_minimum_size = Vector2(LARG_DX - 20, (LARG_DX - 20) * Plancia.DIM.y / Plancia.DIM.x)
 	vp.add_child(plancia)
-	# dadi in alto a destra
+	# dadi in alto a sinistra
 	p_dado = UI.pannello(UI.FONDO, UI.FONDO2)
-	p_dado.anchor_left = 1
-	p_dado.anchor_right = 1
-	p_dado.offset_right = -10
+	p_dado.offset_left = 10
 	p_dado.offset_top = 74
-	p_dado.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	add_child(p_dado)
 	dado_box = UI.riga(12)
 	p_dado.add_child(dado_box)
@@ -184,7 +189,7 @@ func mostra_plancia(i: int) -> void:
 	plancia_nome.text = "%s  -  %s%s%s" % [a.n, Dati.NOMI_MARCE[int(a.m)] if int(a.m) > 0 else "in griglia",
 		"  -  ultimo tiro %d" % int(a.d) if int(a.d) > 0 else "", extra]
 	plancia_nome.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	plancia_nome.custom_minimum_size.x = 430
+	plancia_nome.custom_minimum_size.x = LARG_DX - 20
 	plancia_nome.add_theme_color_override("font_color", Dati.colore_auto(int(a.p)).lightened(0.3))
 	plancia.imposta(v.regole, a.pf, int(a.m))
 
@@ -264,9 +269,18 @@ func cronaca(t: String, tipo := "info") -> void:
 			col = Color(0.4, 1.0, 0.5)
 		"ordine", "giro":
 			col = Color(0.55, 0.8, 1.0)
-	var l := UI.testo(t, 20, col, false, 440)
+	var l := UI.testo(t, 20, col, false, LARG_DX - 30)
 	cronaca_box.add_child(l)
-	while cronaca_box.get_child_count() > 7:
+	while cronaca_box.get_child_count() > 14:
+		var c := cronaca_box.get_child(0)
+		cronaca_box.remove_child(c)
+		c.queue_free()
+	_taglia_cronaca.call_deferred()
+
+## Toglie le righe più vecchie che non entrano tutte intere nella cronaca.
+func _taglia_cronaca() -> void:
+	await get_tree().process_frame
+	while cronaca_box.get_child_count() > 1 and cronaca_box.get_combined_minimum_size().y > finestra.size.y:
 		var c := cronaca_box.get_child(0)
 		cronaca_box.remove_child(c)
 		c.queue_free()
@@ -626,6 +640,10 @@ func mostra_fine() -> void:
 		var b1 := UI.bottone("Nuova gara", 30, Color(0.1, 0.6, 0.2), 260, 60)
 		b1.pressed.connect(func(): comando.emit("rivincita"))
 		hb.add_child(b1)
+	if v.has("storia"):
+		var br := UI.bottone("Rivedi la gara", 30, Color(0.15, 0.4, 0.75), 270, 60)
+		br.pressed.connect(func(): comando.emit("replay"))
+		hb.add_child(br)
 	var b2 := UI.bottone("Guarda il tabellone", 30, UI.FONDO2, 300, 60)
 	b2.pressed.connect(chiudi_velo)
 	hb.add_child(b2)
@@ -633,3 +651,31 @@ func mostra_fine() -> void:
 	b3.pressed.connect(func(): comando.emit("esci"))
 	hb.add_child(b3)
 	vb.add_child(hb)
+
+# ------------------------------------------------------------------ replay
+
+var _rep_mondo: Node
+var _rep_testo: Label
+var _rep_ultimo := 1
+
+func mostra_replay(m: Node, ultimo: int) -> void:
+	_rep_mondo = m
+	_rep_ultimo = ultimo
+	_svuota_azione()
+	p_azione.visible = true
+	azione.add_child(UI.testo("Replay della gara", 32, UI.GIALLO, true))
+	_rep_testo = UI.testo("Turno 1 di %d" % ultimo, 24, UI.CHIARO)
+	azione.add_child(_rep_testo)
+	var h := UI.riga(10)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	azione.add_child(h)
+	for b in [["Più lento", "replay_lento", UI.FONDO2], ["Più veloce", "replay_veloce", UI.FONDO2], ["Fine replay", "replay_fine", UI.ROSSO]]:
+		var bt := UI.bottone(b[0], 24, b[2], 180, 52)
+		var cosa: String = b[1]
+		bt.pressed.connect(func(): comando.emit(cosa))
+		h.add_child(bt)
+
+func _process(_d: float) -> void:
+	if _rep_mondo != null and _rep_mondo.replay_attivo and _rep_testo != null and is_instance_valid(_rep_testo):
+		_rep_testo.text = "Turno %d di %d  -  %s" % [_rep_mondo.replay_turno, _rep_ultimo,
+			"velocità normale" if is_equal_approx(_rep_mondo.replay_tempo, 1.0) else ("un turno ogni %.1f secondi" % _rep_mondo.replay_tempo).replace(".", ",")]

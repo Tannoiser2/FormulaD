@@ -70,6 +70,11 @@ static func nuova(conf: Dictionary) -> Motore:
 		m.s.meteo = [3, 1, 0][r]
 		m._msg("Meteo: %s" % Dati.NOMI_METEO[m.s.meteo], "ordine")
 		m.eventi.append({"t": "meteo", "m": m.s.meteo})
+	# la storia della gara per il replay: posizioni di partenza, poi ogni movimento e ogni uscita con il suo turno
+	var via := {}
+	for a in m.s.auto:
+		via[str(a.i)] = a.c
+	m.s.storia = {"via": via, "mosse": []}
 	m._riordina()
 	return m
 
@@ -264,6 +269,7 @@ func _elimina(a: Dictionary, perche: String) -> void:
 	a.fuori_n = s.turno * 100 + a.giro
 	a.dove = a.c
 	eventi.append({"t": "fuori", "auto": a.i, "c": a.c, "perche": perche})
+	_storia({"a": a.i, "x": "fuori"})
 	_msg("%s è fuori gara: %s" % [a.nome, perche], "fuori", a.i)
 	if avanzate():
 		if _in_movimento == a.i:
@@ -828,6 +834,7 @@ func _muovi(a: Dictionary, cid: String) -> void:
 	a.c = cid
 	a.ferm = o.fermate
 	eventi.append({"t": "muovi", "auto": a.i, "percorso": o.percorso, "scia": int(o.get("scia", 0))})
+	_storia({"a": a.i, "p": o.percorso.duplicate()})
 	if int(o.get("scia", 0)) > 0:
 		_msg("%s prende la scia%s" % [a.nome, "" if o.scia == 1 else " %d volte" % o.scia], "info", a.i)
 	if e.finisce:
@@ -849,7 +856,9 @@ func _muovi(a: Dictionary, cid: String) -> void:
 			motivi.append("lungo di %d alla curva %d" % [o.oltre, o.curva])
 		if int(o.get("scia_curve", 0)) > 0:
 			motivi.append("scia fin dentro la curva")
-		_usura(a, e.usura, ", ".join(motivi), false)
+		if int(o.get("extra", {}).get("jk", 0)) != 0:
+			motivi.append("derapata")
+		_usura(a, e.usura, ", ".join(motivi) if not motivi.is_empty() else "mossa", false)
 		if e.box:
 			rapida = _sosta(a)
 		if e.testa and not a.fuori:
@@ -1003,12 +1012,19 @@ func _sosta(a: Dictionary) -> int:
 	_nero_evento(a, v, "sosta ai box", "sosta lenta: riparte al prossimo turno, al massimo in 4a", false)
 	return 0
 
+func _storia(voce: Dictionary) -> void:
+	if not s.has("storia"):
+		return
+	voce["tr"] = int(s.turno)
+	s.storia.mosse.append(voce)
+
 func _arriva(a: Dictionary) -> void:
 	s.arrivi.append(a.i)
 	a.posto_arrivo = s.arrivi.size()
 	a.dove = a.c
 	a.c = ""
 	eventi.append({"t": "arrivo", "auto": a.i, "posto": a.posto_arrivo})
+	_storia({"a": a.i, "x": "arrivo"})
 	if a.posto_arrivo == 1:
 		_msg("%s vince la gara!" % a.nome, "arrivo", a.i)
 	else:
@@ -1059,4 +1075,6 @@ func vista() -> Dictionary:
 					"fr": o.freno, "ol": o.oltre, "ni": int(o.get("extra", {}).get("ni", 0)), "jk": int(o.get("extra", {}).get("jk", 0))})
 			att.opz = l
 		v.att = att
+	if s.fase == "fine" and s.has("storia"):
+		v["storia"] = s.storia
 	return v

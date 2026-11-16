@@ -35,6 +35,7 @@ func _ready() -> void:
 	hud = Interfaccia.new()
 	strato.add_child(hud)
 	hud.visible = false
+	mondo.pannelli = hud
 	hud.decisione.connect(_decisione)
 	hud.comando.connect(_comando)
 	menu = Menu.new()
@@ -77,6 +78,25 @@ func _ready() -> void:
 			"opzioni": {"strada": par.has("strada"), "meteo": par.has("meteo"), "libero": par.has("libero")}})
 
 # ------------------------------------------------------------------ comandi
+
+## Il replay di tutta la gara, poi di nuovo la classifica finale.
+func _replay() -> void:
+	var v: Dictionary = hud.v
+	if not v.has("storia") or mondo.replay_attivo:
+		return
+	hud.chiudi_velo()
+	hud.pulisci_dadi()
+	var lista := []
+	var ultimo := 1
+	for i in v.auto.size():
+		lista.append({"i": i, "p": int(v.auto[i].p), "n": str(v.auto[i].n)})
+	for m in v.storia.mosse:
+		ultimo = max(ultimo, int(m.tr))
+	hud.mostra_replay(mondo, ultimo)
+	await mondo.replay(v.storia, lista)
+	hud.chiedi()
+	if hud.v.fase == "fine":
+		hud.mostra_fine()
 
 func _comando(cosa: String) -> void:
 	if cosa.begins_with("guarda:"):
@@ -127,7 +147,16 @@ func _comando(cosa: String) -> void:
 				if motore.applica(az):
 					mondo.togli_opzioni()
 					_ciclo()
+		"replay":
+			_replay()
+		"replay_lento":
+			mondo.replay_tempo = min(mondo.replay_tempo * 1.5, 3.0)
+		"replay_veloce":
+			mondo.replay_tempo = max(mondo.replay_tempo / 1.5, 0.2)
+		"replay_fine":
+			mondo.ferma_replay()
 		"rivincita":
+			mondo.ferma_replay()
 			hud.chiudi_velo()
 			if not _ultima_conf.is_empty():
 				_via(_ultima_conf)

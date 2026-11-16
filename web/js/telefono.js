@@ -290,14 +290,14 @@ function plancia(a, marce) {
     for (const [id, , col] of ZONE.avanzate) {
       let n = a.pf[id];
       if (!(n > 0)) continue;
-      if (id === 'gomme') { n = Math.min(n, 14); perno(puntoPlancia(PLANCIA.colX[(n - 1) % 7], PLANCIA.rigaZ[Math.floor((n - 1) / 7)]), 17, col); }
-      else { n = Math.min(n, 7); perno(puntoPlancia(PLANCIA.colX[n - 1], PLANCIA.rigaZ[PLANCIA.righe[id]]), 17, col); }
+      if (id === 'gomme') { n = Math.min(n, 14); perno(puntoPlancia(PLANCIA.colX[(n - 1) % 7], PLANCIA.rigaZ[Math.floor((n - 1) / 7)]), 21, col); }
+      else { n = Math.min(n, 7); perno(puntoPlancia(PLANCIA.colX[n - 1], PLANCIA.rigaZ[PLANCIA.righe[id]]), 21, col); }
     }
   } else {
     const n = Math.max(0, Math.min(18, a.pf.ps || 0));
-    if (n > 0) perno(puntoPlancia(PLANCIA.colX[(n - 1) % 3], PLANCIA.rigaZ[6 - Math.floor((n - 1) / 3)]), 17, '#e61a1a');
+    if (n > 0) perno(puntoPlancia(PLANCIA.colX[(n - 1) % 3], PLANCIA.rigaZ[6 - Math.floor((n - 1) / 3)]), 21, '#e61a1a');
   }
-  if (a.m >= 1) perno(puntoMarcia(a.m), 21, stato.regole === 'avanzate' ? '#e61a1a' : '#26262e');
+  if (a.m >= 1) perno(puntoMarcia(a.m), 30, stato.regole === 'avanzate' ? '#e61a1a' : '#26262e');
   for (const o of marce) {
     const [x, y] = puntoMarcia(o.m);
     const sel = o.m === marciaVista;
