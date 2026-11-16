@@ -24,9 +24,15 @@ var dado_box: HBoxContainer
 var p_sx: PanelContainer
 var col_dx: VBoxContainer
 var b_mappa: Button
+var b_cronaca: Button
+var titolo_ordine: Label
+var p_ass: PanelContainer
+var ass_box: VBoxContainer
 var scritte_icone := func() -> bool: return true   # chiede al tabellone come sono scritte le caselle
 var finestra: Control
 const LARG_DX := 540.0
+const MIN_AZIONE := 190.0   # spazio sempre riservato alle scelte
+const ALTA_PLANCIA := (LARG_DX - 20) * 498.0 / 823.0   # la plancia intera, in proporzione
 var p_cron: PanelContainer
 var barra: PanelContainer
 var velo: Control
@@ -64,8 +70,7 @@ func _ready() -> void:
 	barra_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	barra_info.clip_text = true
 	hb.add_child(barra_info)
-	for b in [["Telecamera: segue", "segui"], ["< Gira", "gira_sx"], ["Gira >", "gira_dx"], ["Inclina", "inclina"],
-			["Vista intera", "vista"], ["Caselle", "mappa"], ["Regole", "regole"], ["Menu", "menu"]]:
+	for b in [["Telecamera: segue", "segui"], ["Vista intera", "vista"], ["Caselle", "mappa"], ["Regole", "regole"], ["Menu", "menu"]]:
 		var bt := UI.bottone(b[0], 22, UI.FONDO2, 96, 44)
 		bt.pressed.connect(func(): comando.emit(b[1]))
 		hb.add_child(bt)
@@ -91,18 +96,31 @@ func _ready() -> void:
 	col_dx.add_child(p_sx)
 	var vs := UI.colonna(4)
 	p_sx.add_child(vs)
-	vs.add_child(UI.testo("ORDINE DI GIOCO", 24, UI.GIALLO, true))
+	titolo_ordine = UI.testo("ORDINE DI GIOCO", 24, UI.GIALLO, true)
+	vs.add_child(titolo_ordine)
 	lista = UI.colonna(3)
 	vs.add_child(lista)
-	# cronaca: occupa lo spazio che resta, le righe più vecchie escono in alto
+	# cronaca: finestra richiudibile in alto a sinistra
 	p_cron = UI.pannello(UI.FONDO, UI.FONDO2)
-	p_cron.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col_dx.add_child(p_cron)
+	p_cron.offset_left = 10
+	p_cron.offset_top = 74
+	p_cron.custom_minimum_size.x = LARG_DX
+	add_child(p_cron)
+	var vc := UI.colonna(4)
+	p_cron.add_child(vc)
+	b_cronaca = UI.bottone("Cronaca: nascondi", 20, UI.FONDO2, 200, 36)
+	b_cronaca.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	b_cronaca.pressed.connect(func():
+		finestra.visible = not finestra.visible
+		b_cronaca.text = "Cronaca: nascondi" if finestra.visible else "Cronaca: mostra"
+		if finestra.visible:
+			_taglia_cronaca.call_deferred())
+	vc.add_child(b_cronaca)
 	finestra = Control.new()
 	finestra.clip_contents = true
 	finestra.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	finestra.custom_minimum_size.y = 26
-	p_cron.add_child(finestra)
+	finestra.custom_minimum_size = Vector2(LARG_DX - 20, 230)
+	vc.add_child(finestra)
 	cronaca_box = UI.colonna(2)
 	cronaca_box.anchor_left = 0
 	cronaca_box.anchor_right = 1
@@ -110,51 +128,57 @@ func _ready() -> void:
 	cronaca_box.anchor_bottom = 1
 	cronaca_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	finestra.add_child(cronaca_box)
-	# azione in basso al centro
+	# dadi sotto l'ordine di gioco
+	p_dado = UI.pannello(UI.FONDO, UI.FONDO2)
+	col_dx.add_child(p_dado)
+	p_dado.custom_minimum_size.y = 116
+	dado_box = UI.riga(12)
+	p_dado.add_child(dado_box)
+	# le scelte sotto i dadi
 	p_azione = UI.pannello()
-	p_azione.anchor_left = 0.5
-	p_azione.anchor_right = 0.5
-	p_azione.anchor_top = 1
-	p_azione.anchor_bottom = 1
-	p_azione.offset_bottom = -10
-	p_azione.offset_left = -(LARG_DX + 10) / 2.0
-	p_azione.offset_right = -(LARG_DX + 10) / 2.0
-	p_azione.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	p_azione.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	p_azione.custom_minimum_size = Vector2(640, 0)
-	add_child(p_azione)
+	p_azione.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col_dx.add_child(p_azione)
+	var scorri := ScrollContainer.new()
+	scorri.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	p_azione.add_child(scorri)
 	azione = UI.colonna(8)
-	p_azione.add_child(azione)
+	azione.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scorri.add_child(azione)
 	# plancia in fondo alla colonna
 	p_plancia = UI.pannello(UI.FONDO, UI.FONDO2, 14, 2, 8)
 	col_dx.add_child(p_plancia)
 	var vp := UI.colonna(4)
 	p_plancia.add_child(vp)
-	plancia_nome = UI.testo("", 24, UI.CHIARO)
+	plancia_nome = UI.testo("", 22, UI.CHIARO)
+	plancia_nome.clip_text = true
 	vp.add_child(plancia_nome)
 	plancia = Plancia.new()
-	plancia.custom_minimum_size = Vector2(LARG_DX - 20, (LARG_DX - 20) * Plancia.DIM.y / Plancia.DIM.x)
+	# la plancia prende lo spazio che resta in fondo alla colonna (al massimo tutta la larghezza)
+	plancia.custom_minimum_size = Vector2(LARG_DX - 20, ALTA_PLANCIA)
 	vp.add_child(plancia)
-	plancia_info = UI.testo("", 22, UI.GIALLO, false, LARG_DX - 20)
-	plancia_info.visible = false
-	vp.add_child(plancia_info)
 	plancia.sopra.connect(func(m: int):
 		marcia_vista = m
 		_info_marcia()
 		comando.emit("anteprima"))
 	plancia.scelta.connect(func(m: int):
 		plancia.offri([], 0)
-		plancia_info.visible = false
 		decisione.emit({"t": "marcia", "m": m}))
-	# dadi in alto a sinistra
-	p_dado = UI.pannello(UI.FONDO, UI.FONDO2)
-	p_dado.offset_left = 10
-	p_dado.offset_top = 74
-	add_child(p_dado)
-	dado_box = UI.riga(12)
-	p_dado.add_child(dado_box)
-	p_dado.visible = false
-	_pannelli = [barra, p_sx, p_cron, p_azione, p_plancia, p_dado]
+	# finestra della preparazione dell'auto (assetto e gomme), al centro del tabellone
+	p_ass = UI.pannello()
+	p_ass.anchor_left = 0.5
+	p_ass.anchor_right = 0.5
+	p_ass.anchor_top = 0.5
+	p_ass.anchor_bottom = 0.5
+	p_ass.offset_left = -(LARG_DX + 10) / 2.0
+	p_ass.offset_right = -(LARG_DX + 10) / 2.0
+	p_ass.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	p_ass.grow_vertical = Control.GROW_DIRECTION_BOTH
+	p_ass.custom_minimum_size.x = 660
+	p_ass.visible = false
+	add_child(p_ass)
+	ass_box = UI.colonna(8)
+	p_ass.add_child(ass_box)
+	_pannelli = [barra, p_ass, p_sx, p_cron, p_azione, p_plancia, p_dado]
 
 ## Vero se il punto è sopra un pannello: lì i tocchi non devono muovere il tabellone.
 func sopra(p: Vector2) -> bool:
@@ -207,8 +231,8 @@ func mostra_plancia(i: int) -> void:
 	if v.get("str", false):
 		extra += "  -  Nitro %s" % ("pronto" if a.get("ni", false) else "usato")
 	plancia_nome.text = "%s  -  %s%s%s" % [a.n, Dati.NOMI_MARCE[int(a.m)] if int(a.m) > 0 else "in griglia",
-		"  -  ultimo tiro %d" % int(a.d) if int(a.d) > 0 else "", extra]
-	plancia_nome.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		"  -  tiro %d" % int(a.d) if int(a.d) > 0 else "", extra]
+	plancia_nome.clip_text = true
 	plancia_nome.custom_minimum_size.x = LARG_DX - 20
 	plancia_nome.add_theme_color_override("font_color", Dati.colore_auto(int(a.p)).lightened(0.3))
 	plancia.imposta(v.regole, a.pf, int(a.m))
@@ -218,11 +242,11 @@ func mostra_plancia(i: int) -> void:
 		_info_marcia()
 	else:
 		plancia.offri([], 0)
-		plancia_info.visible = false
 
 func _classifica() -> void:
 	for c in lista.get_children():
 		c.queue_free()
+	titolo_ordine.text = "ORDINE DI GIOCO"
 	var in_ordine: Array = []
 	for i in v.ordine:
 		in_ordine.append(int(i))
@@ -232,17 +256,17 @@ func _classifica() -> void:
 		var a: Dictionary = v.auto[i]
 		riga_n += 1
 		var sf := UI.FONDO2 if i != di_turno else Color(0.45, 0.08, 0.1)
-		var pr := UI.pannello(sf, UI.GIALLO if i == di_turno else sf, 8, 2 if i == di_turno else 0, 4)
+		var pr := UI.pannello(sf, UI.GIALLO if i == di_turno else sf, 8, 2 if i == di_turno else 0, 2)
 		var h := UI.riga(8)
 		pr.add_child(h)
 		var col := Dati.colore_auto(int(a.p))
-		h.add_child(UI.chip(col, Vector2(14, 34)))
+		h.add_child(UI.chip(col, Vector2(12, 26)))
 		var stato := ""
 		if int(a.pa) > 0:
 			stato = "%d° ARRIVATO" % int(a.pa)
 		elif a.f:
 			stato = "RITIRATO"
-		var nome := UI.testo(str(a.n), 24, UI.CHIARO if stato == "" or int(a.pa) > 0 else UI.GRIGIO)
+		var nome := UI.testo(str(a.n), 22, UI.CHIARO if stato == "" or int(a.pa) > 0 else UI.GRIGIO)
 		nome.custom_minimum_size.x = 170
 		nome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nome.clip_text = true
@@ -253,7 +277,7 @@ func _classifica() -> void:
 		else:
 			var m := int(a.m)
 			var pm := UI.pannello(Dati.COLORI_MARCE[m], Color.BLACK, 6, 1, 2)
-			pm.custom_minimum_size = Vector2(40, 30)
+			pm.custom_minimum_size = Vector2(40, 26)
 			var lm := UI.testo(Dati.NOMI_MARCE[m] if m > 0 else "-", 22, Color.WHITE if m != 1 else Color.BLACK)
 			lm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			pm.add_child(lm)
@@ -281,7 +305,7 @@ func _classifica() -> void:
 	else:
 		lista.add_child(UI.testo("Il numero giallo sono i Punti Struttura rimasti", 18, UI.GRIGIO))
 	if int(v.get("mt", -1)) >= 0:
-		lista.add_child(UI.testo("Meteo: %s" % Dati.NOMI_METEO[int(v.mt)], 22, UI.GIALLO))
+		titolo_ordine.text = "ORDINE DI GIOCO  -  %s" % Dati.NOMI_METEO[int(v.mt)].to_upper()
 
 func cronaca(t: String, tipo := "info") -> void:
 	var col := UI.CHIARO
@@ -317,13 +341,13 @@ func _taglia_cronaca() -> void:
 func _faccia(testo: String, col: Color, chiaro: bool, sotto: String) -> Control:
 	var vb := UI.colonna(2)
 	var p := UI.pannello(col, Color.WHITE if not chiaro else Color.BLACK, 12, 3, 4)
-	p.custom_minimum_size = Vector2(92, 92)
-	var l := UI.testo(testo, 58, Color.BLACK if chiaro else Color.WHITE, true)
+	p.custom_minimum_size = Vector2(72, 72)
+	var l := UI.testo(testo, 46, Color.BLACK if chiaro else Color.WHITE, true)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	p.add_child(l)
 	vb.add_child(p)
-	var s := UI.testo(sotto, 20, UI.GRIGIO)
+	var s := UI.testo(sotto, 18, UI.GRIGIO)
 	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(s)
 	return vb
@@ -331,12 +355,10 @@ func _faccia(testo: String, col: Color, chiaro: bool, sotto: String) -> Control:
 func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 0.6) -> void:
 	for c in dado_box.get_children():
 		c.queue_free()
-	var d3 := Dado3D.new(118)
+	var d3 := Dado3D.new(90)
 	dado_box.add_child(d3)
-	p_dado.visible = true
 	await d3.mostra(marcia, faccia, durata)
 	dado_box.add_child(_faccia(str(valore), Dati.COLORI_MARCE[marcia], marcia == 1, "%s in %s" % [nome.split(" ")[0], Dati.NOMI_MARCE[marcia]]))
-	p_dado.visible = true
 
 func mostra_nero(valore: int, motivo: String, male: bool) -> void:
 	if dado_box.get_child_count() > 4:
@@ -345,12 +367,10 @@ func mostra_nero(valore: int, motivo: String, male: bool) -> void:
 	if male:
 		(c.get_child(0) as PanelContainer).add_theme_stylebox_override("panel", UI.riquadro(Color(0.05, 0.05, 0.06), UI.ROSSO, 12, 4, 4))
 	dado_box.add_child(c)
-	p_dado.visible = true
 
 func pulisci_dadi() -> void:
 	for c in dado_box.get_children():
 		c.queue_free()
-	p_dado.visible = false
 
 # ------------------------------------------------------------------ decisioni
 
@@ -363,12 +383,13 @@ func _svuota_azione() -> void:
 ## Mostra che cosa si aspetta: la scelta (se tocca a un'auto di questo schermo) o chi deve giocare.
 func chiedi() -> void:
 	_svuota_azione()
+	p_ass.visible = false
+	for c in ass_box.get_children():
+		ass_box.remove_child(c)
+		c.queue_free()
 	plancia.offri([], 0)
-	plancia_info.visible = false
 	if v.is_empty() or v.att == null:
-		p_azione.visible = false
 		return
-	p_azione.visible = true
 	var i := int(v.att.auto)
 	var a: Dictionary = v.auto[i]
 	var col := Dati.colore_auto(int(a.p)).lightened(0.3)
@@ -388,14 +409,19 @@ func chiedi() -> void:
 		_chiedi_assetto(i, a, col)
 		return
 	if v.att.tipo == "marcia":
-		# niente riquadro: le marce si scelgono sulla plancia
-		p_azione.visible = false
+		# le marce si scelgono sulla plancia; qui solo il titolo e il riassunto della marcia sotto il puntatore
+		azione.add_child(UI.testo("%s: scegli la marcia" % a.n, 32, col, true))
+		plancia_info = UI.testo("", 22, UI.GIALLO, false, LARG_DX - 40)
+		azione.add_child(plancia_info)
 		mostra_plancia(i)
 		return
 	if v.att.tipo == "mossa":
 		azione.add_child(UI.testo("%s: tiro %d in %s" % [a.n, int(v.att.tiro), Dati.NOMI_MARCE[int(a.m)]], 32, col, true))
-		azione.add_child(UI.testo("Tocca sul tabellone una casella colorata, poi conferma.", 22, UI.CHIARO, false, 600))
-		var h := UI.riga(10)
+		azione.add_child(UI.testo("Tocca sul tabellone una casella colorata, poi conferma.", 22, UI.CHIARO, false, LARG_DX - 40))
+		var h := HFlowContainer.new()
+		h.add_theme_constant_override("h_separation", 8)
+		h.add_theme_constant_override("v_separation", 4)
+		h.custom_minimum_size.x = LARG_DX - 40
 		for l in [[Mondo.COL_LIBERA, "libera"], [Mondo.COL_COSTO, "costa punti"], [Mondo.COL_TESTA, "testacoda"], [Mondo.COL_FUORI, "ritiro"],
 				[Mondo.COL_BOX, "box"], [Mondo.COL_ARRIVO, "traguardo"]]:
 			h.add_child(UI.chip(l[0], Vector2(20, 20)))
@@ -411,15 +437,15 @@ func chiedi() -> void:
 		if con_extra:
 			var h2 := UI.riga(10)
 			h2.add_child(UI.chip(Mondo.COL_EXTRA, Vector2(20, 20)))
-			h2.add_child(UI.testo("bordo azzurro: casella in più facoltativa (scia, Nitro, gomme morbide)", 18, UI.GRIGIO))
+			h2.add_child(UI.testo("bordo azzurro: casella in più facoltativa (scia, Nitro, gomme morbide)", 18, UI.GRIGIO, false, LARG_DX - 80))
 			azione.add_child(h2)
 
 ## La riga sotto la plancia mentre si sceglie la marcia.
 func _info_marcia() -> void:
-	plancia_info.visible = true
-	var a: Dictionary = v.auto[int(v.att.auto)]
+	if plancia_info == null or not is_instance_valid(plancia_info):
+		return
 	if marcia_vista <= 0:
-		plancia_info.text = "%s: scegli la marcia sulla plancia. Passa sopra (o tocca) una marcia illuminata per vedere dove arrivi, poi clic (o secondo tocco) per innestarla e tirare il dado." % a.n
+		plancia_info.text = "Le marce possibili sono illuminate sulla plancia. Passaci sopra (o toccale) per vedere dove arrivi, poi clic (o secondo tocco) per innestarla e tirare il dado."
 		return
 	for o in v.att.marce:
 		if int(o.m) != marcia_vista:
@@ -440,6 +466,9 @@ func _info_marcia() -> void:
 ## Prima del via (assetto libero e gomme) o al box (gomme nuove).
 func _chiedi_assetto(i: int, a: Dictionary, col: Color) -> void:
 	var att: Dictionary = v.att
+	# una finestra al centro: la colonna di destra non cambia
+	p_ass.visible = true
+	azione.add_child(UI.testo("%s: prepara l'auto nella finestra al centro." % a.n, 24, col, false, LARG_DX - 40))
 	if _ass_chi != i or _ass_pf.is_empty():
 		_ass_chi = i
 		_ass_pf = {}
@@ -449,19 +478,19 @@ func _chiedi_assetto(i: int, a: Dictionary, col: Color) -> void:
 		if att.box and att.gomme.has("pioggia") and int(v.get("mt", -1)) >= 2:
 			_ass_g = "pioggia"
 	var titolo := "%s: gomme nuove al box" % a.n if att.box else "%s: prepara l'auto" % a.n
-	azione.add_child(UI.testo(titolo, 32, col, true))
+	ass_box.add_child(UI.testo(titolo, 32, col, true))
 	if int(v.get("mt", -1)) >= 0:
-		azione.add_child(UI.testo("Meteo: %s" % Dati.NOMI_METEO[int(v.mt)], 24, UI.GIALLO))
+		ass_box.add_child(UI.testo("Meteo: %s" % Dati.NOMI_METEO[int(v.mt)], 24, UI.GIALLO))
 	var tot := 0
 	for k in _ass_pf:
 		tot += int(_ass_pf[k])
 	if att.libero:
-		azione.add_child(UI.testo("Ripartisci %d punti fra le zone (Gomme 1-14, le altre 1-7)." % Dati.ASSETTO_TOTALE, 20, UI.GRIGIO, false, 600))
+		ass_box.add_child(UI.testo("Ripartisci %d punti fra le zone (Gomme 1-14, le altre 1-7)." % Dati.ASSETTO_TOTALE, 20, UI.GRIGIO, false, 600))
 		var g := GridContainer.new()
 		g.columns = 6
 		g.add_theme_constant_override("h_separation", 8)
 		g.add_theme_constant_override("v_separation", 4)
-		azione.add_child(g)
+		ass_box.add_child(g)
 		for z in Dati.zone(v.regole):
 			var zid: String = z.id
 			var ln := UI.testo(z.nome, 22, Dati.COLORI_ZONE[zid].lightened(0.35))
@@ -495,19 +524,19 @@ func _chiedi_assetto(i: int, a: Dictionary, col: Color) -> void:
 			tr = "Punti di troppo: %d (togline qualcuno)" % -resta
 		var lr := UI.testo(tr,
 			22, UI.GIALLO if resta != 0 else Color(0.5, 0.9, 0.5))
-		azione.add_child(lr)
+		ass_box.add_child(lr)
 	if att.gomme.size() > 1:
 		var h := UI.riga(8)
 		h.alignment = BoxContainer.ALIGNMENT_CENTER
-		azione.add_child(h)
+		ass_box.add_child(h)
 		for gt in att.gomme:
 			var nome_g: String = gt
-			var b := UI.bottone("Gomme " + Dati.NOMI_GOMME[gt].to_lower(), 22, UI.ROSSO if _ass_g == gt else UI.FONDO2, 190, 48)
+			var b := UI.bottone(Dati.NOMI_GOMME[gt], 22, UI.ROSSO if _ass_g == gt else UI.FONDO2, 150, 48)
 			b.pressed.connect(func():
 				_ass_g = nome_g
 				chiedi())
 			h.add_child(b)
-		azione.add_child(UI.testo(Dati.DESCR_GOMME.get(_ass_g, ""), 20, UI.CHIARO, false, 600))
+		ass_box.add_child(UI.testo(Dati.DESCR_GOMME.get(_ass_g, ""), 20, UI.CHIARO, false, 600))
 	var ok := UI.bottone("CONFERMA", 32, Color(0.1, 0.6, 0.2), 300, 58)
 	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	ok.disabled = att.libero and tot != Dati.ASSETTO_TOTALE
@@ -517,7 +546,7 @@ func _chiedi_assetto(i: int, a: Dictionary, col: Color) -> void:
 			az["pf"] = _ass_pf.duplicate()
 		_ass_chi = -1
 		decisione.emit(az))
-	azione.add_child(ok)
+	ass_box.add_child(ok)
 
 const COL_ESITO := [Mondo.COL_LIBERA, Mondo.COL_COSTO, Mondo.COL_TESTA, Mondo.COL_FUORI]
 
@@ -581,7 +610,7 @@ func scegli_opzione(o: Dictionary) -> void:
 	chiedi()
 	opz_scelta = o
 	var male: bool = str(o.fu) != "" or o.te
-	azione.add_child(UI.testo(testo_opzione(v.regole, o), 26, UI.ROSSO.lightened(0.3) if male else UI.GIALLO, false, 600))
+	azione.add_child(UI.testo(testo_opzione(v.regole, o), 26, UI.ROSSO.lightened(0.3) if male else UI.GIALLO, false, LARG_DX - 40))
 	var b := UI.bottone("CONFERMA", 32, Color(0.1, 0.6, 0.2) if not male else UI.ROSSO, 300, 60)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var cid: String = o.c
@@ -698,12 +727,31 @@ func mostra_replay(m: Node, ultimo: int) -> void:
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
 	azione.add_child(h)
 	for b in [["Più lento", "replay_lento", UI.FONDO2], ["Più veloce", "replay_veloce", UI.FONDO2], ["Fine replay", "replay_fine", UI.ROSSO]]:
-		var bt := UI.bottone(b[0], 24, b[2], 180, 52)
+		var bt := UI.bottone(b[0], 22, b[2], 150, 50)
 		var cosa: String = b[1]
 		bt.pressed.connect(func(): comando.emit(cosa))
 		h.add_child(bt)
 
+## La plancia prende lo spazio che resta in fondo alla colonna, al massimo la sua misura intera.
+func _adatta_plancia() -> void:
+	if col_dx == null or not col_dx.visible:
+		return
+	var altri := 0.0
+	var n := 0
+	for c in col_dx.get_children():
+		n += 1
+		if c == p_azione:
+			altri += MIN_AZIONE
+		elif c != p_plancia:
+			altri += c.get_combined_minimum_size().y
+	var resto := p_plancia.get_combined_minimum_size().y - plancia.custom_minimum_size.y
+	var libero: float = col_dx.size.y - altri - resto - 8.0 * max(0, n - 1)
+	var h: float = clamp(libero, 150.0, ALTA_PLANCIA)
+	if absf(h - plancia.custom_minimum_size.y) > 1.0:
+		plancia.custom_minimum_size.y = h
+
 func _process(_d: float) -> void:
+	_adatta_plancia()
 	if _rep_mondo != null and _rep_mondo.replay_attivo and _rep_testo != null and is_instance_valid(_rep_testo):
 		_rep_testo.text = "Turno %d di %d  -  %s" % [_rep_mondo.replay_turno, _rep_ultimo,
 			"velocità normale" if is_equal_approx(_rep_mondo.replay_tempo, 1.0) else ("un turno ogni %.1f secondi" % _rep_mondo.replay_tempo).replace(".", ",")]

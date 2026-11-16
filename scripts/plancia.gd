@@ -46,6 +46,7 @@ func centro_marcia(m: int) -> Vector2:
 	return _punto(g[0], g[1]) * _scala()
 
 func _marcia_in(p: Vector2) -> int:
+	p -= _origine()
 	var meglio := 0
 	var d_m := 60.0 * _scala()
 	for o in marce:
@@ -97,7 +98,12 @@ func _perno(p: Vector2, s: float, col: Color, r := 1.0) -> void:
 	draw_circle(c, 17.5 * k, col)
 	draw_circle(c - Vector2(5, 5) * k, 6 * k, Color(1, 1, 1, 0.55))
 
+## Dove comincia il disegno: la plancia sta centrata in orizzontale nello spazio che ha.
+func _origine() -> Vector2:
+	return Vector2(max(0.0, (size.x - DIM.x * _scala()) * 0.5), 0)
+
 func _draw() -> void:
+	draw_set_transform(_origine())
 	var s: float = _scala()
 	var tex := tex_av if regole == "avanzate" else tex_base
 	if tex == null:

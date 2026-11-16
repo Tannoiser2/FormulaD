@@ -323,7 +323,7 @@ func _decisione(az: Dictionary) -> void:
 		con_n["n"] = _ultimo_n
 		rete.azione("az", con_n)
 		mondo.togli_opzioni()
-		hud.p_azione.visible = false
+		hud._svuota_azione()
 		return
 	if motore == null or _gira or motore.s.attesa == null:
 		return
@@ -526,7 +526,7 @@ func _evento_rete(e: Dictionary) -> void:
 			hud.visible = true
 			hud.ospite = true
 			hud.cronaca("Sei nella stanza %s: aspetta il via" % rete.codice, "ordine")
-			hud.p_azione.visible = false
+			hud._svuota_azione()
 		"stato":
 			var d = JSON.parse_string(str(e.j))
 			if d is Dictionary:

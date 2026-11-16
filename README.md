@@ -34,8 +34,9 @@ Si gioca qui: **https://tannoiser2.github.io/FormulaD/**
    rotola e sul tabellone si colorano le **caselle dove puoi arrivare**: verde libera, gialla costa punti (il numero
    dice quanti), arancione testacoda, rossa ritiro, azzurra il tuo box, bianca il traguardo. Tocca una casella per
    leggere che cosa comporta, poi **Conferma** (o tocca di nuovo la stessa casella).
-4. A destra, una sotto l'altra, l'ordine di gioco del turno (marcia, giro e punti di ogni auto: toccando una riga
-   si inquadra quell'auto e si vede la sua plancia), la cronaca e la plancia; in alto a sinistra i dadi.
+4. A destra, fissi uno sotto l'altro: ordine di gioco (toccando una riga si inquadra quell'auto e si vede la sua
+   plancia), dadi, scelte del turno e plancia, dove si sceglie la marcia. In alto a sinistra la cronaca, che si può
+   nascondere. La preparazione dell'auto (assetto e gomme) si fa in una finestra al centro.
 5. Le caselle raggiungibili sono colorate (verde libera, giallo costa punti...) con sopra l'icona della zona che si
    rovina e quanti punti si perdono; il pulsante «Sulle caselle» passa alle parole (Gomme 2, Freni 1...).
 6. A fine gara **Rivedi la gara** fa il replay di tutta la corsa: in ogni turno le auto si muovono insieme, ognuna
