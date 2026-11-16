@@ -1020,6 +1020,13 @@ func _sosta(a: Dictionary) -> int:
 	_nero_evento(a, v, "sosta ai box", "sosta lenta: riparte al prossimo turno, al massimo in 4a", false)
 	return 0
 
+## Le fermate nella curva in cui si trova l'auto: [fatte, obbligatorie], vuoto se non è in curva.
+func _fermate_ora(a: Dictionary) -> Array:
+	var c = pista.per_id.get(a.c)
+	if c == null or int(c.c) <= 0 or a.fuori:
+		return []
+	return [max(1, int(a.ferm)), int(pista.fermate.get(int(c.c), 1))]
+
 func _storia(voce: Dictionary) -> void:
 	if not s.has("storia"):
 		return
@@ -1051,7 +1058,7 @@ func vista() -> Dictionary:
 		v.auto.append({"n": a.nome, "p": a.pilota, "u": a.uid, "tp": a.tipo, "c": a.c, "m": a.marcia, "pf": a.pf, "g": a.giro,
 			"f": a.fuori, "pa": a.posto_arrivo, "t": a.testa, "d": a.dado, "mo": a.mosso == s.turno, "w": a.perche,
 			"dv": a.get("dove", ""), "gt": a.get("gomme_tipo", "dure"), "et": int(a.get("eta", 0)),
-			"ni": s.get("strada", false) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {})})
+			"ni": s.get("strada", false) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {}), "fs": _fermate_ora(a)})
 	if s.attesa != null:
 		var a: Dictionary = s.auto[s.attesa.auto]
 		var att := {"tipo": s.attesa.tipo, "auto": a.i, "uid": a.uid}

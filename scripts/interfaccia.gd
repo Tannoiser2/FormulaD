@@ -134,8 +134,10 @@ func _ready() -> void:
 	# dadi sotto l'ordine di gioco
 	p_dado = UI.pannello(UI.FONDO, UI.FONDO2)
 	col_dx.add_child(p_dado)
-	p_dado.custom_minimum_size.y = 116
+	p_dado.custom_minimum_size.y = 136
 	dado_box = UI.riga(12)
+	dado_box.custom_minimum_size.y = 110
+	dado_box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	p_dado.add_child(dado_box)
 	# le scelte sotto i dadi
 	p_azione = UI.pannello()
@@ -259,7 +261,7 @@ func _classifica() -> void:
 		var a: Dictionary = v.auto[i]
 		riga_n += 1
 		var sf := UI.FONDO2 if i != di_turno else Color(0.45, 0.08, 0.1)
-		var pr := UI.pannello(sf, UI.GIALLO if i == di_turno else sf, 8, 2 if i == di_turno else 0, 2)
+		var pr := UI.pannello(sf, UI.GIALLO if i == di_turno else sf, 8, 2, 2)
 		var h := UI.riga(8)
 		pr.add_child(h)
 		var col := Dati.colore_auto(int(a.p))
@@ -270,10 +272,12 @@ func _classifica() -> void:
 		elif a.f:
 			stato = "RITIRATO"
 		var nome := UI.testo(str(a.n), 22, UI.CHIARO if stato == "" or int(a.pa) > 0 else UI.GRIGIO)
-		nome.custom_minimum_size.x = 170
-		nome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		nome.clip_text = true
 		h.add_child(nome)
+		# pallini delle fermate nella curva in cui si trova: pieni quelli fatti, vuoti quelli che mancano
+		var pall := Pallini.new()
+		pall.fermate = a.get("fs", [])
+		pall.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(pall)
 		if stato != "":
 			var ls := UI.testo(stato, 22, UI.GIALLO if int(a.pa) > 0 else UI.ROSSO)
 			h.add_child(ls)
@@ -294,8 +298,10 @@ func _classifica() -> void:
 				lz.custom_minimum_size.x = 30 if v.regole == "base" else 17
 				lz.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				h.add_child(lz)
-			if a.mo:
-				h.add_child(UI.testo("ok", 20, UI.GRIGIO))
+			# colonna «ok» sempre presente (vuota se non ha ancora mosso): le colonne restano allineate
+			var lo := UI.testo("ok" if a.mo else "", 20, UI.GRIGIO)
+			lo.custom_minimum_size.x = 22
+			h.add_child(lo)
 		var i_auto: int = i
 		pr.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed:
@@ -732,3 +738,22 @@ func _process(_d: float) -> void:
 	if _rep_mondo != null and _rep_mondo.replay_attivo and _rep_testo != null and is_instance_valid(_rep_testo):
 		_rep_testo.text = "Turno %d di %d  -  %s" % [_rep_mondo.replay_turno, _rep_ultimo,
 			"velocità normale" if is_equal_approx(_rep_mondo.replay_tempo, 1.0) else ("un turno ogni %.1f secondi" % _rep_mondo.replay_tempo).replace(".", ",")]
+
+
+## I pallini delle fermate in curva accanto al nome nell'ordine di gioco.
+class Pallini extends Control:
+	var fermate: Array = []
+	func _ready() -> void:
+		custom_minimum_size = Vector2(30, 26)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		if fermate.size() < 2:
+			return
+		var fatte := int(fermate[0])
+		var servono: int = max(int(fermate[1]), fatte)
+		for k in servono:
+			var c := Vector2(7 + k * 14, size.y * 0.5)
+			if k < fatte:
+				draw_circle(c, 5.5, Color(1, 0.85, 0.15) if k < int(fermate[1]) else Color(0.6, 0.9, 0.6))
+			else:
+				draw_arc(c, 5.0, 0, TAU, 20, Color(1, 0.85, 0.15), 1.6, true)
