@@ -16,6 +16,7 @@ var cronaca_box: VBoxContainer
 var azione: VBoxContainer
 var p_azione: PanelContainer
 var p_plancia: PanelContainer
+var plancia_info: Label
 var plancia: Plancia
 var plancia_nome: Label
 var p_dado: PanelContainer
@@ -130,6 +131,17 @@ func _ready() -> void:
 	plancia = Plancia.new()
 	plancia.custom_minimum_size = Vector2(LARG_DX - 20, (LARG_DX - 20) * Plancia.DIM.y / Plancia.DIM.x)
 	vp.add_child(plancia)
+	plancia_info = UI.testo("", 22, UI.GIALLO, false, LARG_DX - 20)
+	plancia_info.visible = false
+	vp.add_child(plancia_info)
+	plancia.sopra.connect(func(m: int):
+		marcia_vista = m
+		_info_marcia()
+		comando.emit("anteprima"))
+	plancia.scelta.connect(func(m: int):
+		plancia.offri([], 0)
+		plancia_info.visible = false
+		decisione.emit({"t": "marcia", "m": m}))
 	# dadi in alto a sinistra
 	p_dado = UI.pannello(UI.FONDO, UI.FONDO2)
 	p_dado.offset_left = 10
@@ -192,6 +204,13 @@ func mostra_plancia(i: int) -> void:
 	plancia_nome.custom_minimum_size.x = LARG_DX - 20
 	plancia_nome.add_theme_color_override("font_color", Dati.colore_auto(int(a.p)).lightened(0.3))
 	plancia.imposta(v.regole, a.pf, int(a.m))
+	# le marce si scelgono sulla plancia di chi deve decidere
+	if v.att != null and str(v.att.tipo) == "marcia" and int(v.att.auto) == i and _mio(i):
+		plancia.offri(v.att.marce, marcia_vista)
+		_info_marcia()
+	else:
+		plancia.offri([], 0)
+		plancia_info.visible = false
 
 func _classifica() -> void:
 	for c in lista.get_children():
@@ -336,6 +355,8 @@ func _svuota_azione() -> void:
 ## Mostra che cosa si aspetta: la scelta (se tocca a un'auto di questo schermo) o chi deve giocare.
 func chiedi() -> void:
 	_svuota_azione()
+	plancia.offri([], 0)
+	plancia_info.visible = false
 	if v.is_empty() or v.att == null:
 		p_azione.visible = false
 		return
@@ -359,47 +380,11 @@ func chiedi() -> void:
 		_chiedi_assetto(i, a, col)
 		return
 	if v.att.tipo == "marcia":
-		azione.add_child(UI.testo("%s: scegli la marcia" % a.n, 32, col, true))
-		var h := UI.riga(10)
-		h.alignment = BoxContainer.ALIGNMENT_CENTER
-		azione.add_child(h)
-		var vista_o = null
-		for o in v.att.marce:
-			var m := int(o.m)
-			var costo := Dati.testo_usura(v.regole, o.costo)
-			var t := "%s\n%s" % [Dati.NOMI_MARCE[m], Dati.INTERVALLI[m]]
-			if costo != "":
-				t += "\n-" + costo
-			if o.fuori:
-				t += "\nRITIRO!"
-			if m == marcia_vista:
-				t = "%s\nCONFERMA" % Dati.NOMI_MARCE[m]
-				vista_o = o
-			var b := UI.bottone(t, 26, Dati.COLORI_MARCE[m], 118, 110)
-			if marcia_vista > 0 and m != marcia_vista:
-				b.modulate = Color(1, 1, 1, 0.55)
-			b.pressed.connect(func():
-				if marcia_vista == m:
-					decisione.emit({"t": "marcia", "m": m})
-					return
-				marcia_vista = m
-				chiedi()
-				comando.emit("anteprima"))
-			h.add_child(b)
-		if vista_o != null and vista_o.has("pv"):
-			azione.add_child(UI.testo("In %s, tiro per tiro (il meglio che si può fare):" % Dati.NOMI_MARCE[marcia_vista], 20, UI.GRIGIO, false, 600))
-			var ht := HFlowContainer.new()
-			ht.add_theme_constant_override("h_separation", 6)
-			ht.add_theme_constant_override("v_separation", 6)
-			ht.alignment = FlowContainer.ALIGNMENT_CENTER
-			azione.add_child(ht)
-			for e in vista_o.pv.t:
-				ht.add_child(_esito(int(e[0]), int(e[1]), int(e[2])))
-			azione.add_child(UI.testo("Sul tabellone le caselle dove puoi arrivare. Tocca ancora la marcia per confermare, un'altra per cambiare.", 20, UI.GIALLO, false, 600))
-			return
-		var nota := "Marcia attuale: %s. Si sale di una alla volta; scalare più di una marcia rovina l'auto." % Dati.NOMI_MARCE[int(a.m)]
-		azione.add_child(UI.testo(nota, 20, UI.GRIGIO, false, 600))
-	else:
+		# niente riquadro: le marce si scelgono sulla plancia
+		p_azione.visible = false
+		mostra_plancia(i)
+		return
+	if v.att.tipo == "mossa":
 		azione.add_child(UI.testo("%s: tiro %d in %s" % [a.n, int(v.att.tiro), Dati.NOMI_MARCE[int(a.m)]], 32, col, true))
 		azione.add_child(UI.testo("Tocca sul tabellone una casella colorata, poi conferma.", 22, UI.CHIARO, false, 600))
 		var h := UI.riga(10)
@@ -416,6 +401,29 @@ func chiedi() -> void:
 			h2.add_child(UI.chip(Mondo.COL_EXTRA, Vector2(20, 20)))
 			h2.add_child(UI.testo("bordo azzurro: casella in più facoltativa (scia, Nitro, gomme morbide)", 18, UI.GRIGIO))
 			azione.add_child(h2)
+
+## La riga sotto la plancia mentre si sceglie la marcia.
+func _info_marcia() -> void:
+	plancia_info.visible = true
+	var a: Dictionary = v.auto[int(v.att.auto)]
+	if marcia_vista <= 0:
+		plancia_info.text = "%s: scegli la marcia sulla plancia. Passa sopra (o tocca) una marcia illuminata per vedere dove arrivi, poi clic (o secondo tocco) per innestarla e tirare il dado." % a.n
+		return
+	for o in v.att.marce:
+		if int(o.m) != marcia_vista:
+			continue
+		var t := "%s, dado %s" % [Dati.NOMI_MARCE[marcia_vista], Dati.INTERVALLI[marcia_vista]]
+		var costo := Dati.testo_usura(v.regole, o.costo)
+		if o.fuori:
+			t += "  -  RITIRO!"
+		elif costo != "":
+			t += "  -  scalare costa " + costo
+		var peggio := 0
+		for e in o.get("pv", {}).get("t", []):
+			peggio = max(peggio, int(e[1]))
+		t += ["  -  ogni tiro ha una casella libera", "  -  qualche tiro costa punti", "  -  qualche tiro porta al testacoda",
+			"  -  qualche tiro porta al ritiro"][peggio] if o.has("pv") else ""
+		plancia_info.text = t + ".  Clic (o secondo tocco) per innestarla e tirare."
 
 ## Prima del via (assetto libero e gomme) o al box (gomme nuove).
 func _chiedi_assetto(i: int, a: Dictionary, col: Color) -> void:
