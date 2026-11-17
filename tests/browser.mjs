@@ -12,7 +12,9 @@ const dir = path.resolve(process.argv[2] || 'build/web');
 const out = path.resolve(process.argv[3] || '/tmp/prova_web');
 const NT = Number(process.argv[4] || 2);
 const DURATA = Number(process.argv[5] || 240) * 1000;
-const OSPITE = process.env.OSPITE !== '0';
+// ONLINE=1: gara online (un computer ospite; un telefono che prova a entrare deve essere respinto)
+const ONLINE = process.env.ONLINE === '1';
+const OSPITE = ONLINE;
 fs.mkdirSync(out, { recursive: true });
 const tipi = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm', '.pck': 'application/octet-stream',
   '.css': 'text/css', '.ttf': 'font/ttf', '.webp': 'image/webp', '.png': 'image/png' };
@@ -38,8 +40,8 @@ await tv.setViewportSize({ width: Number(process.env.LARG || 1280), height: Numb
 tv.setDefaultTimeout(180000);
 ascolta(tv, 'TV');
 async function foto(p, f) { try { await p.screenshot({ path: `${out}/${f}.png`, timeout: 120000 }); } catch (e) { console.log('foto non riuscita', f); } }
-const quanti = NT + (OSPITE ? 1 : 0);
-await tv.goto(`http://localhost:8765/index.html?rete=locale&subito&veloce=3&stanza=${quanti}&regole=${process.env.REGOLE || 'avanzate'}${process.env.OPZ || ''}`);
+const quanti = ONLINE ? 1 : NT;
+await tv.goto(`http://localhost:8765/index.html?rete=locale&subito&veloce=3&stanza=${quanti}${ONLINE ? '&online' : ''}&regole=${process.env.REGOLE || 'avanzate'}${process.env.OPZ || ''}`);
 let codice = '';
 for (let i = 0; i < 240 && !codice; i++) {
   await tv.waitForTimeout(1000);
@@ -58,10 +60,18 @@ for (let i = 0; i < NT; i++) {
   if (i === 0) await foto(p, 'tel_0_ingresso');
   await p.fill('#nom', nomi[i]);
   await p.click('#entra');
-  tel.push(p);
   await tv.waitForTimeout(1200);
+  if (ONLINE) {
+    await tv.waitForTimeout(8000);
+    const t = await p.evaluate(() => document.body.innerText + ' | sk=' + (window.FDprova?.stato()?.sk ?? 'nessuno'));
+    console.log('telefono:', JSON.stringify(t.slice(-300)));
+    console.log(t.includes('si gioca dal computer') ? 'telefono respinto dalla gara online: ok' : 'ERRORE: il telefono non è stato respinto');
+    await foto(p, 'tel_respinto');
+    continue;
+  }
+  tel.push(p);
 }
-await foto(tel[0], 'tel_1_attesa');
+if (tel[0]) await foto(tel[0], 'tel_1_attesa');
 await foto(tv, 'tv_2_stanza_piena');
 let osp = null;
 if (OSPITE) {

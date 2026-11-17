@@ -8,12 +8,13 @@ signal comando(cosa: String)
 
 const TIPI_LOCALE := ["umano", "ia", "chiuso"]
 const TIPI_STANZA := ["remoto", "ia", "umano", "chiuso"]
-const NOMI_TIPO := {"umano": "Questo schermo", "ia": "Computer", "chiuso": "Non corre", "remoto": "Telefono / online"}
+const NOMI_TIPO := {"umano": "Questo schermo", "ia": "Computer", "chiuso": "Non corre", "remoto": "Telefono"}
 const COL_TIPO := {"umano": Color(0.1, 0.55, 0.2), "ia": Color(0.2, 0.3, 0.5), "chiuso": Color(0.22, 0.23, 0.26), "remoto": Color(0.7, 0.4, 0.05)}
 
 var sfondo: ColorRect
 var corpo: Control
 var stanza := false
+var tipo_stanza := "tv"     # "tv": tabellone qui e scelte dai telefoni; "online": ognuno gioca dal suo computer
 var pista_n := 0
 var giri := 2
 var regole := "base"
@@ -43,7 +44,10 @@ func _posti_iniziali() -> void:
 	posti = []
 	for i in Dati.PILOTI.size():
 		var tipo := "chiuso"
-		if stanza:
+		if stanza and tipo_stanza == "online":
+			# chi apre la gara guida la prima auto dal suo computer
+			tipo = "umano" if i == 0 else ("remoto" if i < 4 else ("ia" if i < 6 else "chiuso"))
+		elif stanza:
 			tipo = "remoto" if i < 4 else ("ia" if i < 6 else "chiuso")
 		else:
 			tipo = "umano" if i == 0 else ("ia" if i < 6 else "chiuso")
@@ -78,8 +82,9 @@ func principale() -> void:
 	vb.add_child(UI.spazio(0, 10))
 	var voci := [
 		["GARA SU QUESTO SCHERMO", "Da soli contro il computer, o in più a turno sullo stesso schermo", "locale", UI.ROSSO],
-		["TV + TELEFONI  /  ONLINE", "Apri una stanza: tabellone qui, i piloti entrano con il QR code o il codice", "stanza", Color(0.75, 0.42, 0.05)],
-		["ENTRA IN UNA STANZA", "Gioca da questo schermo in una gara aperta da un altro", "entra", Color(0.15, 0.35, 0.6)],
+		["TV + TELEFONI", "Il tabellone su questo schermo, ogni pilota sceglie dal suo telefono (QR code)", "stanza_tv", Color(0.75, 0.42, 0.05)],
+		["GARA ONLINE", "Ognuno gioca dal suo computer e vede la stessa gara: apri la gara e dai il codice", "stanza_online", Color(0.15, 0.35, 0.6)],
+		["ENTRA IN UNA GARA ONLINE", "Gioca da questo computer in una gara online aperta da un altro", "entra", Color(0.12, 0.45, 0.5)],
 	]
 	if ha_salvataggio:
 		voci.append(["RIPRENDI LA GARA SALVATA", "Continua dall'ultimo turno", "riprendi", Color(0.1, 0.55, 0.2)])
@@ -105,7 +110,8 @@ func _voce(cosa: String) -> void:
 			stanza = false
 			_posti_iniziali()
 			preparazione()
-		"stanza":
+		"stanza", "stanza_tv", "stanza_online":
+			tipo_stanza = "online" if cosa == "stanza_online" else "tv"
 			if not in_rete:
 				avviso = "Le stanze funzionano dalla versione web del gioco (GitHub Pages)."
 				principale()
@@ -136,7 +142,7 @@ func _scelta(etichetta: String, valori: Array, attuale, quando: Callable) -> HBo
 
 func preparazione() -> void:
 	var vb := _nuovo_corpo()
-	var t := UI.testo("PREPARA LA GARA" if not stanza else "STANZA DI GARA", 60, UI.ROSSO, true)
+	var t := UI.testo("PREPARA LA GARA" if not stanza else ("TV + TELEFONI" if tipo_stanza == "tv" else "GARA ONLINE"), 60, UI.ROSSO, true)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(t)
 	var h := UI.riga(24)
@@ -207,7 +213,7 @@ func preparazione() -> void:
 	if stanza:
 		var hq := UI.riga(14)
 		vs.add_child(hq)
-		if qr_tex != null and codice != "":
+		if qr_tex != null and codice != "" and tipo_stanza == "tv":
 			var q := TextureRect.new()
 			q.texture = qr_tex
 			q.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -219,9 +225,17 @@ func preparazione() -> void:
 		if codice == "":
 			vq.add_child(UI.testo("Apro la stanza..." if avviso == "" else avviso, 28, UI.GIALLO, false, 480))
 		else:
-			vq.add_child(UI.testo("CODICE STANZA", 22, UI.GRIGIO))
+			vq.add_child(UI.testo("CODICE STANZA" if tipo_stanza == "tv" else "CODICE DELLA GARA", 22, UI.GRIGIO))
 			vq.add_child(UI.testo(codice, 80, UI.GIALLO, true))
-			vq.add_child(UI.testo("Inquadra il QR con il telefono, oppure apri il gioco e scegli «Entra in una stanza».", 20, UI.CHIARO, false, 300))
+			if tipo_stanza == "tv":
+				vq.add_child(UI.testo("Ogni pilota inquadra il QR con il telefono (o apre la pagina del telefono e scrive il codice).", 20, UI.CHIARO, false, 300))
+			else:
+				vq.add_child(UI.testo("Gli altri aprono il gioco sul loro computer, scelgono «Entra in una gara online» e scrivono il codice, oppure aprono il link.", 20, UI.CHIARO, false, 480))
+				var bl := UI.bottone("Copia il link della gara", 20, UI.FONDO2, 260, 40)
+				bl.pressed.connect(func():
+					DisplayServer.clipboard_set(link_gara())
+					bl.text = "Link copiato")
+				vq.add_child(bl)
 	# colonna di destra: i piloti
 	var pd := UI.pannello()
 	h.add_child(pd)
@@ -278,7 +292,7 @@ func _carta_pilota(i: int) -> Control:
 	l.clip_text = true
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(l)
-	var b := UI.bottone(NOMI_TIPO[posto.tipo], 20, COL_TIPO[posto.tipo], 170, 40)
+	var b := UI.bottone(_nome_tipo(posto.tipo), 20, COL_TIPO[posto.tipo], 170, 40)
 	b.pressed.connect(func():
 		var tipi := TIPI_STANZA if stanza else TIPI_LOCALE
 		var k := tipi.find(posto.tipo)
@@ -294,6 +308,19 @@ func _carta_pilota(i: int) -> Control:
 		comando.emit("posti"))
 	vb.add_child(b)
 	return p
+
+func _nome_tipo(t: String) -> String:
+	if stanza and tipo_stanza == "online":
+		return {"umano": "Questo computer", "remoto": "Online"}.get(t, NOMI_TIPO[t])
+	return NOMI_TIPO[t]
+
+## Il link che apre il gioco ed entra direttamente nella gara online.
+func link_gara() -> String:
+	var base := url
+	var k := base.find("telefono.html")
+	if k >= 0:
+		base = base.substr(0, k)
+	return base + "?s=" + codice
 
 ## Un giocatore (telefono o ospite) è entrato: prende il primo posto «Telefono / online» libero.
 func entra_giocatore(uid: String, nome: String) -> bool:
@@ -341,5 +368,5 @@ func vista_attesa() -> Dictionary:
 	var l := []
 	for i in posti.size():
 		l.append({"p": i, "tp": posti[i].tipo, "u": posti[i].uid, "n": posti[i].nome})
-	return {"fase": "attesa", "pista": Dati.PISTE[pista_n], "giri": giri, "regole": regole, "posti": l, "str": strada,
+	return {"fase": "attesa", "sk": tipo_stanza, "pista": Dati.PISTE[pista_n], "giri": giri, "regole": regole, "posti": l, "str": strada,
 		"mon": regole == "avanzate" and meteo, "lib": regole == "avanzate" and libero and not strada}

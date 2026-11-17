@@ -17,8 +17,9 @@ Si gioca qui: **https://tannoiser2.github.io/FormulaD/**
   (Monaco, Zandvoort e la sua variante). Ognuno ha la rete completa di caselle, corsie, frecce delle curve, griglia e box.
 - **Regole base e avanzate**, da 1 a 3 giri, fino a 10 auto.
 - **Piloti guidati dal computer** (prudente, normale, esperto) per giocare da soli.
-- **Online e telefoni**: chi apre una stanza mostra il tabellone (TV, monitor, iPad); gli altri entrano con il gioco
-  completo da un altro schermo oppure **dal telefono**, inquadrando il QR code, e da lì scelgono marcia e casella.
+- **TV + telefoni**: il tabellone su uno schermo grande (TV, monitor, iPad); ogni pilota entra **dal telefono**
+  inquadrando il QR code e da lì sceglie marcia e casella.
+- **Gara online**: ognuno gioca dal suo computer e vede la stessa gara, con il gioco completo.
 - **Tutto in italiano**, comprese le regole in breve dentro il gioco.
 - **Gara salvata a ogni turno** (sul dispositivo e, per le stanze, anche su Firebase): dal menu, *Riprendi la gara salvata*.
 
@@ -26,10 +27,12 @@ Si gioca qui: **https://tannoiser2.github.io/FormulaD/**
 
 1. **Gara su questo schermo** - scegli circuito, giri, regole e chi guida ognuna delle dieci auto (questo schermo,
    computer, oppure non corre). Con più auto su «Questo schermo» si gioca a turno.
-2. **TV + telefoni / Online** - si apre una stanza con un codice di 4 lettere e il QR code. I posti segnati
-   «Telefono / online» vengono presi da chi entra; quelli rimasti liberi alla partenza non corrono.
-   Dal telefono: inquadra il QR (o apri `telefono.html` e scrivi il codice), scrivi il nome e aspetta il via.
-   Da un altro computer o iPad: *Entra in una stanza* e scrivi il codice.
+2. **TV + telefoni** - si apre una stanza con un codice di 4 lettere e il QR code. I posti segnati «Telefono»
+   vengono presi da chi entra; quelli rimasti liberi alla partenza non corrono. Dal telefono: inquadra il QR
+   (o apri `telefono.html` e scrivi il codice), scrivi il nome e aspetta il via. Da un computer non si entra.
+   **Gara online** - chi apre la gara guida dal suo computer (posto «Questo computer») e dà il codice o il link
+   («Copia il link della gara»); gli altri, dal loro computer, scelgono *Entra in una gara online*. I posti
+   «Online» vengono presi da chi entra. Dal telefono non si entra.
 3. Al tuo turno **scegli la marcia** (i pulsanti hanno il colore del dado e dicono quanto costa scalare), il dado
    rotola e sul tabellone si colorano le **caselle dove puoi arrivare**: verde libera, gialla costa punti (il numero
    dice quanti), arancione testacoda, rossa ritiro, azzurra il tuo box, bianca il traguardo. Tocca una casella per
@@ -107,7 +110,7 @@ d'arrivo è quello di gioco (prima chi era davanti).
     il salvataggio;
   - `godot --path . -s tests/foto.gd -- /tmp/foto 1920 1080 avanzate` - fotografie dell'interfaccia;
   - `tools/costruisci_web.sh` - esporta in `build/web` (gioco + telefoni);
-  - `node tests/browser.mjs build/web /tmp/prova 2 600` - schermo grande, 2 telefoni e un ospite nel browser con la
+  - `node tests/browser.mjs build/web /tmp/prova 2 600` - schermo grande e 2 telefoni (con `ONLINE=1`: gara online con un computer ospite e un telefono che deve essere respinto) nel browser con la
     rete locale;
   - parametri della pagina: `?auto=1&bot=6&veloce=3` gara dimostrativa, `?stanza=2` apre subito una stanza che parte
     con 2 giocatori, `?s=CODICE` entra in una stanza, `?rete=locale` (schede dello stesso browser, senza Firebase);

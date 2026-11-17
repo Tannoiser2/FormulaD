@@ -70,7 +70,9 @@ func _ready() -> void:
 		menu.strada = par.has("strada")
 		menu.meteo = par.has("meteo")
 		menu.libero = par.has("libero")
-		menu._voce("stanza")
+		menu._voce("stanza_online" if par.has("online") else "stanza_tv")
+		if par.has("online"):
+			menu.posti[0].tipo = "ia"   # nelle prove nessuno guida da questo computer
 	elif par.has("s"):
 		# aperto con il codice di una stanza: entra come ospite
 		_autoguida = par.has("autoguida")
@@ -157,7 +159,10 @@ func _comando(cosa: String) -> void:
 		"velocita":
 			mondo.velocita = 1.0 if mondo.velocita > 1.5 else 2.5
 		"codice":
-			hud.cronaca("Stanza %s  -  %s" % [rete.codice, rete.url], "ordine")
+			if menu.tipo_stanza == "online":
+				hud.cronaca("Gara online %s  -  %s" % [rete.codice, menu.link_gara()], "ordine")
+			else:
+				hud.cronaca("Stanza %s  -  %s" % [rete.codice, rete.url], "ordine")
 		"decidi":
 			if motore != null and motore.s.attesa != null and not _gira:
 				var az := IA.decidi(motore, livello)
@@ -411,7 +416,7 @@ func _allinea(vista: Dictionary) -> void:
 func _salva() -> void:
 	if motore == null or auto_prova:
 		return
-	var testo := var_to_str({"s": motore.s, "livello": livello, "stanza": modo == "stanza", "codice": rete.codice, "seq": _seq})
+	var testo := var_to_str({"s": motore.s, "livello": livello, "stanza": modo == "stanza", "sk": menu.tipo_stanza, "codice": rete.codice, "seq": _seq})
 	rete.salva("fd_gara", testo)
 	if modo == "stanza":
 		rete.salva_stanza(testo)
@@ -433,6 +438,7 @@ func _riprendi() -> void:
 	motore = m
 	livello = int(d.get("livello", 1))
 	modo = "stanza" if d.get("stanza", false) else "locale"
+	menu.tipo_stanza = str(d.get("sk", "tv"))
 	_apri_gara()
 	if modo == "stanza":
 		# si riapre la stessa stanza (stesso codice e QR): i piloti da telefono rientrano da soli
@@ -449,6 +455,7 @@ func _pubblica(vista: Dictionary, ev: Array) -> void:
 		return
 	_seq += 1
 	var d := vista.duplicate()
+	d["sk"] = menu.tipo_stanza
 	var leggeri := []
 	var testi := _log.duplicate()
 	for e in ev:
@@ -531,7 +538,7 @@ func _evento_rete(e: Dictionary) -> void:
 			menu.visible = false
 			hud.visible = true
 			hud.ospite = true
-			hud.cronaca("Sei nella stanza %s: aspetta il via" % rete.codice, "ordine")
+			hud.cronaca("Sei nella gara online %s: aspetta il via" % rete.codice, "ordine")
 			hud._svuota_azione()
 		"stato":
 			var d = JSON.parse_string(str(e.j))
@@ -561,7 +568,7 @@ func _chiedi_codice() -> void:
 		menu.avviso = "Per entrare in una stanza apri la versione web del gioco."
 		menu.principale()
 		return
-	var c = rete.fr.chiedi("Codice della stanza (4 lettere):", "")
+	var c = rete.fr.chiedi("Codice della gara online (4 lettere):", "")
 	if c == null or str(c).strip_edges().length() != 4:
 		return
 	_entra(str(c).strip_edges().to_upper())
@@ -583,6 +590,13 @@ func _ciclo_ospite() -> void:
 	_ospite_gira = true
 	while not _coda_ospite.is_empty() and modo == "ospite":
 		var d: Dictionary = _coda_ospite.pop_front()
+		if str(d.get("sk", "online")) == "tv":
+			# una stanza TV + telefoni: dal computer non si entra, si usa il telefono
+			var c := rete.codice
+			_al_menu()
+			menu.avviso = "La stanza %s è una gara TV + telefoni: per giocare inquadra il QR con il telefono." % c
+			menu.principale()
+			break
 		if str(d.get("fase")) == "attesa":
 			hud.barra_info.text = "Stanza %s: in attesa del via" % rete.codice
 			continue

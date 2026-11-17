@@ -139,13 +139,24 @@ async function entra() {
     if (!h) { errore = `La stanza ${codice} non esiste`; ingresso(); return; }
     await rete.set(`${RADICE}/${codice}/seats/${uid}`, { uid, name: nome });
     rete.on(`${RADICE}/${codice}/game`, (v) => {
+      if (!codice) return;
       const j = unisci(v);
       if (!j) return;
       try { stato = JSON.parse(j); } catch (e) { return; }
+      if (stato.sk === 'online') {
+        // una gara online si gioca dal computer, non dal telefono
+        rete.remove(`${RADICE}/${codice}/seats/${uid}`).catch(() => {});
+        const c = codice;
+        codice = '';
+        stato = null;
+        app.innerHTML = `<h1>FORMULA D</h1><div class="box"><p class="grande">Gara online ${esc(c)}</p><p class="sotto">Questa gara si gioca dal computer: apri il gioco sul computer e scegli «Entra in una gara online». Il telefono serve per le gare TV + telefoni.</p></div>`;
+        return;
+      }
       disegna();
     });
+    if (!codice) return;   // respinto subito (gara online)
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) { /* ok */ }
-    if (!stato) app.innerHTML = `<h1>FORMULA D</h1><div class="box"><p class="grande">Stanza ${esc(codice)}</p><p class="sotto">Sei dentro, ${esc(nome)}. Aspetta il via sullo schermo grande.</p></div>`;
+    if (!stato && codice) app.innerHTML = `<h1>FORMULA D</h1><div class="box"><p class="grande">Stanza ${esc(codice)}</p><p class="sotto">Sei dentro, ${esc(nome)}. Aspetta il via sullo schermo grande.</p></div>`;
   } catch (e) {
     console.error(e);
     errore = 'Non riesco a collegarmi: ' + (e?.message || e);
