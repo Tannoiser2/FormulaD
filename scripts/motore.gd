@@ -128,8 +128,9 @@ func _inizio(a: Dictionary, zona: String) -> int:
 func _nero() -> int:
 	return rng.randi_range(1, 20)
 
+## Ai box si può entrare in ogni giro, anche nell'ultimo (e nelle gare di un giro solo).
 func _puo_pit(a: Dictionary) -> bool:
-	return a.giro >= 1 and a.giro < s.giri and not pista.pit.is_empty() and not s.get("strada", false)
+	return a.giro >= 1 and not pista.pit.is_empty() and not s.get("strada", false)
 
 func pioggia() -> bool:
 	return int(s.get("meteo", -1)) >= 2
@@ -547,15 +548,20 @@ func opzioni_per(a: Dictionary, tiro: int) -> Dictionary:
 		var o: Dictionary = reach[cid]
 		var c = pista.per_id[cid]
 		var suo_box: bool = c.box != "" and c.box == a.posto and cid != a.c
-		var e := _effetto(a, o, suo_box)
+		var finisce: bool = o.traguardo and a.giro + 1 > s.giri
+		# tagliando il traguardo non si frena, ma l'ultima curva va comunque controllata:
+		# chi ne esce lungo prima della linea paga come sempre (e può anche ritirarsi)
+		var oe := o
+		if finisce and int(o.freno) > 0:
+			oe = o.duplicate()
+			oe.freno = 0
+		var e := _effetto(a, oe, suo_box)
 		if int(o.get("extra", {}).get("jk", 0)) != 0:
 			e.usura["gomme"] = int(e.usura.get("gomme", 0)) + 1
 		e.box = suo_box
-		e.finisce = o.traguardo and a.giro + 1 > s.giri
+		e.finisce = finisce and e.fuori == ""
 		if e.finisce:
-			e.usura = {}
 			e.testa = false
-			e.fuori = ""
 		e.tocca = []
 		if e.fuori == "" and not e.finisce and not c.pit:
 			var acc: Array = pista.vicini.get(cid, [])
@@ -845,6 +851,8 @@ func _muovi(a: Dictionary, cid: String) -> void:
 	if int(o.get("scia", 0)) > 0:
 		_msg("%s prende la scia%s" % [a.nome, "" if o.scia == 1 else " %d volte" % o.scia], "info", a.i)
 	if e.finisce:
+		if not e.usura.is_empty():
+			_usura(a, e.usura, "lungo all'ultima curva", false)
 		a.giro += 1
 		_arriva(a)
 	else:
@@ -1025,7 +1033,12 @@ func _fermate_ora(a: Dictionary) -> Array:
 	var c = pista.per_id.get(a.c)
 	if c == null or int(c.c) <= 0 or a.fuori:
 		return []
-	return [max(1, int(a.ferm)), int(pista.fermate.get(int(c.c), 1))]
+	# -1 = appena arrivata in curva fermandosi (vale una fermata); 0 = entrata andando lungo dalla curva
+	# precedente: quella sosta non conta
+	var fatte := int(a.ferm)
+	if fatte < 0:
+		fatte = 1
+	return [fatte, int(pista.fermate.get(int(c.c), 1))]
 
 func _storia(voce: Dictionary) -> void:
 	if not s.has("storia"):
