@@ -61,9 +61,6 @@ const DESCR_GOMME := {
 
 ## Meteo: 0 bello (fisso), 1 variabile (asciutto), 2 pioggia variabile, 3 pioggia (fissa).
 const NOMI_METEO := ["Bel tempo", "Variabile", "Pioggia (variabile)", "Pioggia"]
-## Tabella del meteo: dado nero fino al primo numero pioggia, fino al secondo variabile, oltre bel tempo.
-const TABELLA_METEO := [7, 12]
-
 ## Gare su strada con le regole avanzate: l'auto di ogni pilota (gomme, freni, cambio, carrozzeria, motore, tenuta).
 const AUTO_STRADA := {
 	"litsu": [7, 3, 2, 2, 3, 3], "jack": [9, 2, 2, 2, 3, 2], "julien": [8, 4, 2, 2, 3, 2], "jenny": [4, 6, 2, 3, 3, 2],

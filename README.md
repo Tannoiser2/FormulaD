@@ -77,8 +77,8 @@ regole facoltative che si accendono nella preparazione della gara (vedi sotto). 
   la marcia), controllo al traguardo che rende qualche punto. Con le avanzate ogni pilota ha la sua auto e un'abilità.
 
 Semplificazioni: la radio di Stanley e i detriti di Temana sono automatici; i punti del controllo vanno da soli alle
-zone più danneggiate; niente sosta tecnica né giro di qualifica (la griglia la decide il dado nero); una sola tabella
-del meteo per tutti i circuiti. I circuiti cittadini con le loro zone speciali (polizia, tunnel...) non ci sono ancora:
+zone più danneggiate; niente sosta tecnica né giro di qualifica (la griglia la decide il dado nero). Il meteo usa la
+tabella stampata su ciascun circuito. I circuiti cittadini con le loro zone speciali (polizia, tunnel...) non ci sono ancora:
 la gara su strada si corre sui circuiti presenti.
 
 Il riepilogo completo è nel gioco (pulsante **Regole**) e in `scripts/dati.gd`.

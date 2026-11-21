@@ -128,9 +128,13 @@ func _inizio(a: Dictionary, zona: String) -> int:
 func _nero() -> int:
 	return rng.randi_range(1, 20)
 
-## Ai box si può entrare in ogni giro, anche nell'ultimo (e nelle gare di un giro solo).
+## Il primo passaggio sulla linea avvia il giro 1: l'età conta soltanto i giri già completati.
+static func eta_gomme(giro: int) -> int:
+	return max(0, giro - 1)
+
+## Si entra ai box soltanto fra due giri: mai nell'ultimo giro o in una gara di un giro solo.
 func _puo_pit(a: Dictionary) -> bool:
-	return a.giro >= 1 and not pista.pit.is_empty() and not s.get("strada", false)
+	return a.giro >= 1 and a.giro < s.giri and not pista.pit.is_empty() and not s.get("strada", false)
 
 func pioggia() -> bool:
 	return int(s.get("meteo", -1)) >= 2
@@ -163,7 +167,7 @@ func _dado_meteo(motivo: String) -> int:
 	return r
 
 func _esito_meteo(v: int) -> int:
-	var tab: Array = Dati.TABELLA_METEO
+	var tab: Array = pista.meteo
 	if v <= int(tab[0]):
 		return 0
 	if v <= int(tab[1]):
@@ -346,8 +350,6 @@ func usura_mossa(o: Dictionary, pf: Dictionary, molt := 1) -> Dictionary:
 				w["gomme"] = int(w.get("gomme", 0)) + n
 			elif n == t:
 				w["gomme"] = int(w.get("gomme", 0)) + n
-				testa = true
-			elif t <= 0 and n == 1:
 				testa = true
 			else:
 				w["gomme"] = int(w.get("gomme", 0)) + n
@@ -861,7 +863,7 @@ func _muovi(a: Dictionary, cid: String) -> void:
 			eventi.append({"t": "giro", "auto": a.i, "giro": a.giro})
 			if a.giro > 1:
 				_msg("%s inizia il giro %d di %d%s" % [a.nome, a.giro, s.giri, " - ultimo giro!" if a.giro == s.giri else ""], "giro", a.i)
-				a.eta = int(a.get("eta", 0)) + 1
+				a.eta = eta_gomme(a.giro)
 				if s.get("strada", false):
 					_controllo(a)
 		var motivi := []

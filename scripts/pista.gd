@@ -6,6 +6,8 @@ extends RefCounted
 var id := ""
 var nome := ""
 var giri := 2
+## Soglie del dado nero: fino alla prima pioggia, fino alla seconda variabile, poi sole.
+var meteo: Array = [7, 12]
 var img := Vector2(2474, 1616)
 var caselle: Array = []
 var per_id: Dictionary = {}
@@ -40,6 +42,9 @@ static func carica(pid: String) -> Pista:
 	p.id = pid
 	p.nome = d.nome
 	p.giri = int(d.giri)
+	var tabella_meteo = d.get("meteo", [7, 12])
+	if tabella_meteo is Array and tabella_meteo.size() == 2:
+		p.meteo = [int(tabella_meteo[0]), int(tabella_meteo[1])]
 	p.img = Vector2(d.img[0], d.img[1])
 	p.caselle = d.caselle
 	for c in p.caselle:
