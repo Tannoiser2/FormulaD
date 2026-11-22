@@ -439,12 +439,24 @@ func _aggiungi_traiettoria() -> void:
 	if not p.aggiungi_collegamento(_editor_da, _editor_a):
 		hud.cronaca("La traiettoria %s → %s esiste già oppure non è valida." % [_editor_da, _editor_a], "avviso")
 		return
-	var chiave := _chiave_editor(p.id)
-	var lista = JSON.parse_string(rete.carica(chiave))
-	if not (lista is Array):
-		lista = []
-	lista.append([_editor_da, _editor_a])
-	rete.salva(chiave, JSON.stringify(lista))
+	var coppia := [_editor_da, _editor_a]
+	var chiave_rimosse := _chiave_editor_rimosse(p.id)
+	var rimosse = JSON.parse_string(rete.carica(chiave_rimosse))
+	if not (rimosse is Array):
+		rimosse = []
+	var indice_rimosso: int = rimosse.find(coppia)
+	if indice_rimosso >= 0:
+		# Era una freccia originale eliminata: riaggiungerla annulla semplicemente l'eliminazione.
+		rimosse.remove_at(indice_rimosso)
+		rete.salva(chiave_rimosse, JSON.stringify(rimosse) if not rimosse.is_empty() else "")
+	else:
+		var chiave := _chiave_editor(p.id)
+		var lista = JSON.parse_string(rete.carica(chiave))
+		if not (lista is Array):
+			lista = []
+		if not lista.has(coppia):
+			lista.append(coppia)
+		rete.salva(chiave, JSON.stringify(lista))
 	hud.cronaca("Traiettoria %s → %s aggiunta per sempre a %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
 	_editor_da = ""
 	_editor_a = ""
