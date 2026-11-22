@@ -110,6 +110,20 @@ func aggiungi_collegamento(da: String, a: String) -> bool:
 	_cache_avanti.clear()
 	return true
 
+## Elimina una traiettoria esistente dall'edizione locale della pista.
+func elimina_collegamento(da: String, a: String) -> bool:
+	if not per_id.has(da) or not per_id.has(a):
+		return false
+	var c: Dictionary = per_id[da]
+	var prossime: Array = c.get("n", [])
+	var indice := prossime.find(a)
+	if indice < 0:
+		return false
+	prossime.remove_at(indice)
+	c.n = prossime
+	_cache_avanti.clear()
+	return true
+
 static func _avvolgi(g: float) -> float:
 	g = fposmod(g, 360.0)
 	return g - 360.0 if g > 180.0 else g

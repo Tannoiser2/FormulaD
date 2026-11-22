@@ -150,6 +150,8 @@ func _comando(cosa: String) -> void:
 				hud.cronaca("EDITOR PISTA: tocca la casella di partenza, poi quella di arrivo. La freccia sarà bianca nella stessa corsia o rossa se cambia corsia.", "ordine")
 		"editor_add":
 			_aggiungi_traiettoria()
+		"editor_delete":
+			_elimina_traiettoria()
 		"editor_export":
 			_esporta_traiettorie()
 		"gira_sx":
@@ -395,9 +397,10 @@ func _casella_mappa(cid: String) -> void:
 		_editor_a = cid
 		mondo.anteprima_mappa(_editor_da, _editor_a)
 		var stessa: bool = int(mondo.pista.per_id[_editor_da].l) == int(c.l)
-		var nuova: bool = _editor_da != _editor_a and not Array(mondo.pista.per_id[_editor_da].get("n", [])).has(_editor_a)
-		hud.segna_editor(true, nuova)
-		hud.cronaca("Editor: %s → %s (%s). Premi Aggiungi per salvarla." % [_editor_da, _editor_a, "bianca" if stessa else "rossa"], "ordine")
+		var esiste: bool = Array(mondo.pista.per_id[_editor_da].get("n", [])).has(_editor_a)
+		var nuova: bool = _editor_da != _editor_a and not esiste
+		hud.segna_editor(true, nuova, esiste)
+		hud.cronaca("Editor: %s → %s (%s). Premi %s." % [_editor_da, _editor_a, "bianca" if stessa else "rossa", "Elimina" if esiste else "Aggiungi"], "ordine")
 
 func _chiudi_editor() -> void:
 	_editor = false
@@ -408,6 +411,9 @@ func _chiudi_editor() -> void:
 
 func _chiave_editor(pid: String) -> String:
 	return "fd_traiettorie_%s" % pid
+
+func _chiave_editor_rimosse(pid: String) -> String:
+	return "fd_traiettorie_rimosse_%s" % pid
 
 func _applica_traiettorie_salvate(p: Pista) -> void:
 	if p == null:
@@ -420,6 +426,11 @@ func _applica_traiettorie_salvate(p: Pista) -> void:
 		for x in lista:
 			if x is Array and x.size() == 2:
 				p.aggiungi_collegamento(str(x[0]), str(x[1]))
+	var rimosse = JSON.parse_string(rete.carica(_chiave_editor_rimosse(p.id)))
+	if rimosse is Array:
+		for x in rimosse:
+			if x is Array and x.size() == 2:
+				p.elimina_collegamento(str(x[0]), str(x[1]))
 
 func _aggiungi_traiettoria() -> void:
 	if not _editor or _editor_da == "" or _editor_a == "":
@@ -440,25 +451,62 @@ func _aggiungi_traiettoria() -> void:
 	mondo.mostra_mappa(true)
 	hud.segna_editor(true, false)
 
+func _elimina_traiettoria() -> void:
+	if not _editor or _editor_da == "" or _editor_a == "":
+		return
+	var p := mondo.pista
+	if not p.elimina_collegamento(_editor_da, _editor_a):
+		hud.cronaca("La traiettoria %s → %s non esiste." % [_editor_da, _editor_a], "avviso")
+		return
+	var coppia := [_editor_da, _editor_a]
+	# Se era stata aggiunta con l'editor, basta annullare l'aggiunta.
+	var chiave_aggiunte := _chiave_editor(p.id)
+	var aggiunte = JSON.parse_string(rete.carica(chiave_aggiunte))
+	if not (aggiunte is Array):
+		aggiunte = []
+	var indice: int = aggiunte.find(coppia)
+	if indice >= 0:
+		aggiunte.remove_at(indice)
+		rete.salva(chiave_aggiunte, JSON.stringify(aggiunte) if not aggiunte.is_empty() else "")
+	else:
+		var chiave_rimosse := _chiave_editor_rimosse(p.id)
+		var rimosse = JSON.parse_string(rete.carica(chiave_rimosse))
+		if not (rimosse is Array):
+			rimosse = []
+		if not rimosse.has(coppia):
+			rimosse.append(coppia)
+		rete.salva(chiave_rimosse, JSON.stringify(rimosse))
+	hud.cronaca("Traiettoria %s → %s eliminata e salvata per %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
+	_editor_da = ""
+	_editor_a = ""
+	mondo.mostra_mappa(true)
+	hud.segna_editor(true)
+
 func _esporta_traiettorie() -> void:
 	var piste := {}
 	var totale := 0
 	for pid in Dati.PISTE:
-		var lista = JSON.parse_string(rete.carica(_chiave_editor(pid)))
-		if lista is Array and not lista.is_empty():
-			var modifiche := []
-			for x in lista:
+		var modifiche := {"aggiunte": [], "eliminazioni": []}
+		var aggiunte = JSON.parse_string(rete.carica(_chiave_editor(pid)))
+		if aggiunte is Array:
+			for x in aggiunte:
 				if x is Array and x.size() == 2:
-					modifiche.append({"da": str(x[0]), "a": str(x[1])})
-			if not modifiche.is_empty():
-				piste[pid] = modifiche
-				totale += modifiche.size()
+					modifiche.aggiunte.append({"da": str(x[0]), "a": str(x[1])})
+		var eliminazioni = JSON.parse_string(rete.carica(_chiave_editor_rimosse(pid)))
+		if eliminazioni is Array:
+			for x in eliminazioni:
+				if x is Array and x.size() == 2:
+					modifiche.eliminazioni.append({"da": str(x[0]), "a": str(x[1])})
+		var numero: int = modifiche.aggiunte.size() + modifiche.eliminazioni.size()
+		if numero > 0:
+			piste[pid] = modifiche
+			totale += numero
 	if totale == 0:
 		hud.cronaca("Non ci sono ancora traiettorie aggiunte da esportare.", "avviso")
 		return
 	var dati := {
 		"formato": "FormulaD-traiettorie",
-		"versione": 1,
+		"versione": 2,
 		"creato": Time.get_datetime_string_from_system(true),
 		"piste": piste,
 	}

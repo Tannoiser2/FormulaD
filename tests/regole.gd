@@ -47,6 +47,8 @@ func _init() -> void:
 	_controlla(prova.aggiungi_collegamento("i.s1.0", "o.s1.1"), "l'editor non aggiunge una traiettoria valida")
 	_controlla(not prova.aggiungi_collegamento("i.s1.0", "o.s1.1"), "l'editor aggiunge due volte la stessa traiettoria")
 	_controlla(not prova.aggiungi_collegamento("i.s1.0", "inesistente"), "l'editor accetta una destinazione inesistente")
+	_controlla(prova.elimina_collegamento("i.s1.0", "o.s1.1"), "l'editor non elimina una traiettoria esistente")
+	_controlla(not prova.elimina_collegamento("i.s1.0", "o.s1.1"), "l'editor elimina due volte la stessa traiettoria")
 
 	print("regole: %d errori" % errori)
 	quit(1 if errori > 0 else 0)
