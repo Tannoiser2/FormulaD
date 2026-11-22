@@ -23,6 +23,9 @@ var auto_prova := false       # prove: la gara va avanti da sola
 var _via_con := 0             # prove: la stanza parte da sola quando sono entrati tanti giocatori
 var _coda_azioni: Array = []
 var _autoguida := false       # prove: l'ospite sceglie da solo
+var _editor := false
+var _editor_da := ""
+var _editor_a := ""
 
 func _ready() -> void:
 	rete = Rete.new()
@@ -45,11 +48,10 @@ func _ready() -> void:
 	menu.in_rete = rete.web
 	mondo.sopra_ui = func(p): return menu.visible or hud.sopra(p)
 	mondo.casella_toccata.connect(_casella)
-	mondo.casella_mappa.connect(func(cid: String):
-		var c = mondo.pista.per_id[cid]
-		hud.cronaca("Casella %s (corsia %s): porta a %s" % [cid, ["box", "destra", "centro", "sinistra"][int(c.l)] if int(c.l) <= 3 else str(c.l),
-			", ".join(PackedStringArray(c.get("n", [])))], "info"))
-	mondo.carica_pista(Pista.carica("FDMonaco"))
+	mondo.casella_mappa.connect(_casella_mappa)
+	var prima := Pista.carica("FDMonaco")
+	_applica_traiettorie_salvate(prima)
+	mondo.carica_pista(prima)
 	menu.ha_salvataggio = rete.carica("fd_gara") != ""
 	mondo.segui = rete.carica("fd_segui") != "0"
 	mondo.scritte_icone = rete.carica("fd_scritte") != "parole"
@@ -132,6 +134,24 @@ func _comando(cosa: String) -> void:
 			hud.b_mappa.text = "Caselle: sì" if acceso else "Caselle"
 			if acceso:
 				hud.cronaca("Mappatura delle caselle: bordo blu corsia di destra, verde centro, arancio sinistra; linee bianche avanti, rosse cambio corsia. Tocca una casella per vederne la sigla e dove porta.", "info")
+			else:
+				_chiudi_editor()
+		"editor":
+			if _editor:
+				_chiudi_editor()
+			else:
+				_editor = true
+				_editor_da = ""
+				_editor_a = ""
+				if mondo.mappa == null:
+					mondo.mostra_mappa(true)
+					hud.b_mappa.text = "Caselle: sì"
+				hud.segna_editor(true)
+				hud.cronaca("EDITOR PISTA: tocca la casella di partenza, poi quella di arrivo. La freccia sarà bianca nella stessa corsia o rossa se cambia corsia.", "ordine")
+		"editor_add":
+			_aggiungi_traiettoria()
+		"editor_export":
+			_esporta_traiettorie()
 		"gira_sx":
 			mondo.gira(-PI / 6.0)
 		"gira_dx":
@@ -210,6 +230,7 @@ func _solo_velo() -> void:
 			c.visible = c != hud.p_dado
 
 func _al_menu() -> void:
+	_chiudi_editor()
 	if modo == "stanza" or modo == "ospite":
 		rete.chiudi()
 	modo = "menu"
@@ -230,12 +251,14 @@ func _via(conf: Dictionary) -> void:
 	_ultima_conf = conf
 	livello = int(conf.get("livello", 1))
 	modo = "stanza" if conf.get("stanza", false) else "locale"
+	_applica_traiettorie_salvate(Pista.carica(str(conf.pista)))
 	motore = Motore.nuova(conf)
 	_apri_gara()
 	motore.avanza()
 	_ciclo()
 
 func _apri_gara() -> void:
+	_chiudi_editor()
 	menu.visible = false
 	hud.visible = true
 	hud.ospite = false
@@ -355,6 +378,93 @@ func _casella(cid: String) -> void:
 		return
 	mondo.segna_scelta(cid)
 	hud.scegli_opzione(mondo.opzioni[cid])
+
+func _casella_mappa(cid: String) -> void:
+	var c = mondo.pista.per_id[cid]
+	if not _editor:
+		hud.cronaca("Casella %s (corsia %s): porta a %s" % [cid, ["box", "destra", "centro", "sinistra"][int(c.l)] if int(c.l) <= 3 else str(c.l),
+			", ".join(PackedStringArray(c.get("n", [])))], "info")
+		return
+	if _editor_da == "" or _editor_a != "":
+		_editor_da = cid
+		_editor_a = ""
+		mondo.anteprima_mappa(_editor_da)
+		hud.segna_editor(true, false)
+		hud.cronaca("Editor: partenza %s. Ora tocca la casella di arrivo." % cid, "info")
+	else:
+		_editor_a = cid
+		mondo.anteprima_mappa(_editor_da, _editor_a)
+		var stessa: bool = int(mondo.pista.per_id[_editor_da].l) == int(c.l)
+		var nuova: bool = _editor_da != _editor_a and not Array(mondo.pista.per_id[_editor_da].get("n", [])).has(_editor_a)
+		hud.segna_editor(true, nuova)
+		hud.cronaca("Editor: %s → %s (%s). Premi Aggiungi per salvarla." % [_editor_da, _editor_a, "bianca" if stessa else "rossa"], "ordine")
+
+func _chiudi_editor() -> void:
+	_editor = false
+	_editor_da = ""
+	_editor_a = ""
+	hud.segna_editor(false)
+	mondo.anteprima_mappa("")
+
+func _chiave_editor(pid: String) -> String:
+	return "fd_traiettorie_%s" % pid
+
+func _applica_traiettorie_salvate(p: Pista) -> void:
+	if p == null:
+		return
+	var testo := rete.carica(_chiave_editor(p.id))
+	if testo == "":
+		return
+	var lista = JSON.parse_string(testo)
+	if lista is Array:
+		for x in lista:
+			if x is Array and x.size() == 2:
+				p.aggiungi_collegamento(str(x[0]), str(x[1]))
+
+func _aggiungi_traiettoria() -> void:
+	if not _editor or _editor_da == "" or _editor_a == "":
+		return
+	var p := mondo.pista
+	if not p.aggiungi_collegamento(_editor_da, _editor_a):
+		hud.cronaca("La traiettoria %s → %s esiste già oppure non è valida." % [_editor_da, _editor_a], "avviso")
+		return
+	var chiave := _chiave_editor(p.id)
+	var lista = JSON.parse_string(rete.carica(chiave))
+	if not (lista is Array):
+		lista = []
+	lista.append([_editor_da, _editor_a])
+	rete.salva(chiave, JSON.stringify(lista))
+	hud.cronaca("Traiettoria %s → %s aggiunta per sempre a %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
+	_editor_da = ""
+	_editor_a = ""
+	mondo.mostra_mappa(true)
+	hud.segna_editor(true, false)
+
+func _esporta_traiettorie() -> void:
+	var piste := {}
+	var totale := 0
+	for pid in Dati.PISTE:
+		var lista = JSON.parse_string(rete.carica(_chiave_editor(pid)))
+		if lista is Array and not lista.is_empty():
+			var modifiche := []
+			for x in lista:
+				if x is Array and x.size() == 2:
+					modifiche.append({"da": str(x[0]), "a": str(x[1])})
+			if not modifiche.is_empty():
+				piste[pid] = modifiche
+				totale += modifiche.size()
+	if totale == 0:
+		hud.cronaca("Non ci sono ancora traiettorie aggiunte da esportare.", "avviso")
+		return
+	var dati := {
+		"formato": "FormulaD-traiettorie",
+		"versione": 1,
+		"creato": Time.get_datetime_string_from_system(true),
+		"piste": piste,
+	}
+	var nome := "FormulaD-traiettorie-%s.json" % Time.get_date_string_from_system()
+	var destinazione := rete.scarica(nome, JSON.stringify(dati, "  "))
+	hud.cronaca("Esportate %d traiettorie di %d piste%s" % [totale, piste.size(), " in " + destinazione if destinazione != "" else "."], "ordine")
 
 ## Mostra uno alla volta gli eventi del motore.
 func _mostra(ev: Array) -> void:

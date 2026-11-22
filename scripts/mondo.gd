@@ -779,6 +779,7 @@ func ferma_replay() -> void:
 
 var mappa: MeshInstance3D            # tutte le caselle con i loro collegamenti (per controllare i circuiti)
 var _mappa_sigle: Array = []
+var _mappa_anteprima: MeshInstance3D
 const COL_CORSIA := {1: Color(0.2, 0.55, 1.0), 2: Color(0.15, 0.85, 0.3), 3: Color(1.0, 0.55, 0.1), 0: Color(0.85, 0.3, 0.9)}
 
 ## Accende o spegne la mappatura: ogni casella con il bordo del colore della sua corsia (blu a destra, verde al centro,
@@ -788,6 +789,7 @@ func mostra_mappa(si: bool) -> void:
 		mappa.queue_free()
 		mappa = null
 	_togli_sigle()
+	_togli_anteprima_mappa()
 	if not si or pista == null:
 		return
 	var st := SurfaceTool.new()
@@ -845,6 +847,60 @@ func _togli_sigle() -> void:
 	for l in _mappa_sigle:
 		l.queue_free()
 	_mappa_sigle.clear()
+
+func _togli_anteprima_mappa() -> void:
+	if _mappa_anteprima != null:
+		_mappa_anteprima.queue_free()
+		_mappa_anteprima = null
+
+## Mostra la traiettoria che l'editor sta per aggiungere: bianca nella corsia, rossa se cambia corsia.
+func anteprima_mappa(da: String, a := "") -> void:
+	_togli_anteprima_mappa()
+	if pista == null or not pista.per_id.has(da):
+		_togli_sigle()
+		return
+	segna_mappa(da)
+	if a == "" or not pista.per_id.has(a):
+		return
+	if a == da:
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var p := pos_casella(da) + Vector3(0, 0.09, 0)
+	var q := pos_casella(a) + Vector3(0, 0.093, 0)
+	var stessa: bool = int(pista.per_id[da].l) == int(pista.per_id[a].l)
+	var col := Color(1, 1, 1, 1) if stessa else Color(1, 0.1, 0.1, 1)
+	var fine := p.lerp(q, 0.82)
+	_segmento(st, p, fine, 0.016, col)
+	var dir := (q - p).normalized()
+	var lat := dir.cross(Vector3.UP) * 0.06
+	_triangolo(st, fine + dir * 0.1, fine + lat, fine - lat, col)
+	_mappa_anteprima = MeshInstance3D.new()
+	_mappa_anteprima.mesh = st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.vertex_color_use_as_albedo = true
+	mat.no_depth_test = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.render_priority = 6
+	_mappa_anteprima.material_override = mat
+	add_child(_mappa_anteprima)
+	_togli_sigle()
+	for cid in [da, a]:
+		var l := Label3D.new()
+		l.text = cid
+		l.font = font
+		l.font_size = 44
+		l.pixel_size = 0.003
+		l.modulate = Color(1, 1, 0.3) if cid == da else col
+		l.outline_size = 12
+		l.outline_modulate = Color.BLACK
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.no_depth_test = true
+		l.render_priority = 7
+		l.position = pos_casella(cid) + Vector3(0, 0.12, 0)
+		add_child(l)
+		_mappa_sigle.append(l)
 
 ## Scrive la sigla della casella toccata e di quelle dove porta.
 func segna_mappa(cid: String) -> void:

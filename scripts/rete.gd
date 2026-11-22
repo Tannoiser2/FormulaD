@@ -95,6 +95,18 @@ func carica(k: String) -> String:
 		return FileAccess.get_file_as_string("user://%s.txt" % k)
 	return ""
 
+## Scarica un file dal browser; nell'app Godot lo salva nella cartella dati dell'utente.
+func scarica(nome: String, testo: String) -> String:
+	if fr:
+		fr.scarica(nome, testo)
+		return ""
+	var percorso := "user://%s" % nome
+	var f := FileAccess.open(percorso, FileAccess.WRITE)
+	if f:
+		f.store_string(testo)
+		return ProjectSettings.globalize_path(percorso)
+	return ""
+
 ## Copia del salvataggio su Firebase (formulad/salvataggi/<uid>).
 func salva_remoto(v: String) -> void:
 	if fr:

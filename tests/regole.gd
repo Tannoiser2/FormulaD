@@ -43,5 +43,10 @@ func _init() -> void:
 		var p := Pista.carica(pid)
 		_controlla(p != null and p.meteo == tabelle[pid], "tabella meteo errata per %s" % pid)
 
+	var prova := Pista.carica("FDMonaco")
+	_controlla(prova.aggiungi_collegamento("i.s1.0", "o.s1.1"), "l'editor non aggiunge una traiettoria valida")
+	_controlla(not prova.aggiungi_collegamento("i.s1.0", "o.s1.1"), "l'editor aggiunge due volte la stessa traiettoria")
+	_controlla(not prova.aggiungi_collegamento("i.s1.0", "inesistente"), "l'editor accetta una destinazione inesistente")
+
 	print("regole: %d errori" % errori)
 	quit(1 if errori > 0 else 0)

@@ -97,6 +97,19 @@ func pos(cid: String) -> Vector2:
 	var c = per_id.get(cid)
 	return Vector2(c.p[0], c.p[1]) if c else Vector2.ZERO
 
+## Aggiunge una traiettoria all'edizione locale della pista. Ritorna false se non è valida o esiste già.
+func aggiungi_collegamento(da: String, a: String) -> bool:
+	if da == a or not per_id.has(da) or not per_id.has(a):
+		return false
+	var c: Dictionary = per_id[da]
+	var prossime: Array = c.get("n", [])
+	if prossime.has(a):
+		return false
+	prossime.append(a)
+	c.n = prossime
+	_cache_avanti.clear()
+	return true
+
 static func _avvolgi(g: float) -> float:
 	g = fposmod(g, 360.0)
 	return g - 360.0 if g > 180.0 else g

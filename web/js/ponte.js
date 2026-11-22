@@ -125,6 +125,18 @@ window.FR = {
   },
   salva(k, v) { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) { /* ok */ } },
   carica(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+  scarica(nome, testo) {
+    try {
+      const url = URL.createObjectURL(new Blob([testo], { type: 'application/json;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nome;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { console.warn('download', e); }
+  },
   // copia del salvataggio su Firebase, legata a questo browser
   async salvaRemoto(v) {
     try { await pronta(); await rete.set(`formulad/salvataggi/${rete.uid}`, v ? { stato: v } : null); } catch (e) { console.warn('salvataggio remoto', e); }
