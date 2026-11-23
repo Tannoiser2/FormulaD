@@ -139,16 +139,16 @@ func _ready() -> void:
 	# dadi sotto l'ordine di gioco
 	p_dado = UI.pannello(UI.FONDO, UI.FONDO2)
 	col_dx.add_child(p_dado)
-	p_dado.custom_minimum_size.y = 136
-	var vdad := UI.colonna(2)
+	p_dado.custom_minimum_size.y = 166
+	var vdad := UI.colonna(8)
 	p_dado.add_child(vdad)
 	dadi_area = Control.new()
 	dadi_area.clip_contents = true
 	dadi_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dadi_area.custom_minimum_size = Vector2(LARG_DX - 40, 72)
+	dadi_area.custom_minimum_size = Vector2(LARG_DX - 40, 96)
 	vdad.add_child(dadi_area)
 	dadi_neri = UI.riga(8)
-	dadi_neri.position = Vector2(0, 12)
+	dadi_neri.position = Vector2(0, 25)
 	dadi_area.add_child(dadi_neri)
 	dadi_testo = UI.testo("", 18, UI.CHIARO, false, LARG_DX - 40)
 	dadi_testo.max_lines_visible = 2
@@ -421,8 +421,8 @@ func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 
 	# i dadi neri dello stesso turno (la partenza) restano, spostati a destra del dado della marcia
 	if is_instance_valid(_dado3):
 		_dado3.queue_free()
-	dadi_neri.position.x = 86.0
-	_dado3 = Dado3D.new(72)
+	dadi_neri.position.x = 108.0
+	_dado3 = Dado3D.new(96)
 	dadi_area.add_child(_dado3)
 	var largo: float = max(dadi_area.size.x, LARG_DX - 40)
 	dadi_testo.text = "%s in %s: %d" % [Dati.corto(nome), Dati.NOMI_MARCE[marcia], valore]
@@ -441,7 +441,7 @@ func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 
 
 ## Un dado nero: un quadratino accanto al dado della marcia; sotto, che cosa ha deciso.
 func mostra_nero(valore: int, motivo: String, male: bool, testo := "", nome := "") -> void:
-	dadi_neri.position.x = 86.0 if is_instance_valid(_dado3) and _dado3 != null else 0.0
+	dadi_neri.position.x = 108.0 if is_instance_valid(_dado3) and _dado3 != null else 0.0
 	while dadi_neri.get_child_count() >= 6:
 		var vecchio := dadi_neri.get_child(0)
 		dadi_neri.remove_child(vecchio)

@@ -7,6 +7,8 @@ var vp: SubViewport
 var dado: MeshInstance3D
 var cam: Camera3D
 var tw: Tween
+## Correzione per marcia: tutti i dadi riempiono il riquadro allo stesso modo (misurato con tests/misura_dadi.gd).
+const GRANDEZZA := {1: 1.51, 2: 1.07, 3: 1.6, 4: 1.38, 5: 1.42, 6: 1.24}
 
 func _init(lato := 150) -> void:
 	stretch = true
@@ -55,7 +57,7 @@ func mostra(marcia: int, faccia: int, durata := 0.6, rotola := false) -> void:
 	m.roughness = 0.4
 	dado.material_override = m
 	var bb := dado.mesh.get_aabb()
-	dado.scale = Vector3.ONE * (1.05 / max(0.1, bb.get_longest_axis_size() * 0.5))
+	dado.scale = Vector3.ONE * (1.05 / max(0.1, bb.get_longest_axis_size() * 0.5)) * float(GRANDEZZA.get(marcia, 1.0))
 	# il dado a sei facce si legge dritto guardandolo dall'altro lato
 	cam.position.z = -2.3 if marcia == 2 else 2.3
 	cam.look_at(Vector3(0, 0.2, 0), Vector3.UP)
