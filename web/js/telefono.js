@@ -199,7 +199,7 @@ function disegna() {
   if (stato.n !== nVisto) { nVisto = stato.n; marciaVista = 0; scelta = null; }
   const io = stato.auto.findIndex((a) => a.u === uid);
   const att = stato.att;
-  const tocca = !!att && att.uid === uid && inviata !== stato.n && stato.fase === 'gara';
+  const tocca = !!att && att.uid === uid && inviata !== stato.n && (stato.fase === 'gara' || stato.fase === 'qualifiche');
   if (tocca && !toccavaAMe) {
     suona('tocca');
     try { navigator.vibrate?.(250); } catch (e) { /* ok */ }
@@ -222,12 +222,15 @@ function disegna() {
     } else {
       az = `<h2>Tocca a te: scegli la marcia</h2><p class="sotto">Tocca una marcia cerchiata sulla plancia: vedrai dove puoi arrivare. Toccala ancora per confermare.</p>`;
     }
+  } else if (tocca && (att.tipo === 'qualifica' || att.tipo === 'qritira')) {
+    az = qualifica(att);
   } else if (tocca && att.tipo === 'assetto') {
     az = assetto(att, mia);
   } else if (tocca && att.tipo === 'mossa') {
     az = `<h2>Tiro <span class="dado" style="background:${COL_MARCE[mia.m]};color:${mia.m === 1 ? '#111' : '#fff'}">${att.tiro}</span> in ${MARCE[mia.m]}</h2>
       <div id="det" class="dettaglio ${scelta && (scelta.fu || scelta.te) ? 'male' : ''}">${scelta ? esc(testoOpz(stato.regole, scelta)) : 'Tocca una casella colorata sulla pista.'}</div>
       <button id="ok" class="${scelta && (scelta.fu || scelta.te) ? '' : 'verde'}" ${scelta ? '' : 'disabled'}>CONFERMA</button>
+      ${att.pp > 0 ? `<button id="pp" class="piccolo">Ritira il dado (Punti Pilota: ${att.pp})</button>` : ''}
       <button id="scritte" class="piccolo">Sulle caselle: ${icone ? 'parole' : 'icone'}</button>`;
   } else if (att) {
     const a = stato.auto[att.auto];
@@ -251,13 +254,17 @@ function disegna() {
     `<div class="zona ${mia.pf[id] <= 1 ? 'poco' : ''}" style="border-color:${c}"><span>${n}</span><b>${Math.max(0, mia.pf[id])}</b></div>`).join('')}</div>`;
   }
 
-  const prep = tocca && att.tipo === 'assetto';
+  const prep = tocca && (att.tipo === 'assetto' || att.tipo === 'qualifica' || att.tipo === 'qritira');
   app.innerHTML = `<div class="gioco ${prep ? 'prep' : ''}">
     <div class="ordine">${ordine(io)}</div>
     <div class="cruscotto ${tocca ? 'tocca' : ''}">${mia && !prep ? '<canvas id="plancia"></canvas>' : ''}${testa}<div class="azione">${az}</div></div>
     <div class="pista"><canvas id="mappa"></canvas></div></div>`;
   app.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { assPf[b.dataset.z] += Number(b.dataset.d); disegna(); }; });
   app.querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => { assG = b.dataset.g; disegna(); }; });
+  app.querySelectorAll('[data-qm]').forEach((b) => { b.onclick = () => manda({ t: 'qualifica', m: Number(b.dataset.qm) }); });
+  app.querySelectorAll('[data-qr]').forEach((b) => { b.onclick = () => manda({ t: 'qritira', si: b.dataset.qr === '1' }); });
+  const bpp = document.getElementById('pp');
+  if (bpp) bpp.onclick = () => manda({ t: 'ritira' });
   const bsc = document.getElementById('scritte');
   if (bsc) bsc.onclick = () => { icone = !icone; try { localStorage.setItem('fd_scritte', icone ? 'icone' : 'parole'); } catch (e) { /* ok */ } disegna(); };
   const oka = document.getElementById('oka');
@@ -296,6 +303,19 @@ function assetto(att, mia) {
   }
   h += `<button id="oka" class="verde" ${att.libero && tot !== 20 ? 'disabled' : ''}>CONFERMA</button>`;
   return h;
+}
+
+// Qualifiche: la marcia del settore, poi se si vuole riprovare.
+function qualifica(att) {
+  if (att.tipo === 'qritira') {
+    return `<h2>Settore ${att.sett + 1}: ${att.punti} punti</h2>
+      <p class="sotto">Hai tirato ${att.tiro} in ${MARCE[att.m]} (limite ${att.limite}). Riprovare costa ${esc(att.costo)}.</p>
+      <div class="gomme"><button data-qr="0" class="su">Tengo ${att.punti} punti</button><button data-qr="1">Riprovo</button></div>`;
+  }
+  let h = `<h2>${esc(att.sessione)}: settore ${att.sett + 1} <small>limite ${att.limite}</small></h2>
+    <p class="sotto">Finora ${att.fatto} punti${att.meglio ? `, il migliore ne ha ${att.meglio}` : ''}. Oltre il limite di 1-4: limite meno 2 a casella; di 5 o più: testacoda.</p><div class="gomme qmarce">`;
+  for (const o of att.marce) h += `<button data-qm="${o.m}">${MARCE[o.m]} (${o.min}-${o.max}): media ${String(o.media).replace('.', ',')}${o.tc ? `<br>testacoda ${o.tc}%` : ''}</button>`;
+  return h + '</div>';
 }
 
 function ordine(io) {

@@ -76,6 +76,12 @@ regole facoltative che si accendono nella preparazione della gara (vedi sotto). 
 - **Gara su strada** (base e avanzate): niente box, **Nitro** una volta per giro (si aggiungono tante caselle quanto
   la marcia), controllo al traguardo che rende qualche punto. Con le avanzate ogni pilota ha la sua auto e un'abilità.
 
+- **Qualifiche a settori** (scelta «Griglia» nella preparazione): al posto del dado nero, tre tiri a giro con le
+  marce dalla 3a alla 6a, sessioni Q1-Q2-Q3 con 8 auto o più (idea di un amico, descritta nelle Regole del gioco).
+- **Campionato** (voce del menu, dal regolamento di Gianluca Lari): più GP di fila con le qualifiche, punti
+  8-6-4-2-1, classifiche piloti, scuderie e premio Gilles Villeneuve, Punti Pilota per ritirare il dado della marcia.
+  Si gioca su questo schermo (contro il computer o a turno) e si salva fra un GP e l'altro.
+
 Semplificazioni: la radio di Stanley e i detriti di Temana sono automatici; i punti del controllo vanno da soli alle
 zone più danneggiate; niente sosta tecnica né giro di qualifica (la griglia la decide il dado nero). Il meteo usa la
 tabella stampata su ciascun circuito. I circuiti cittadini con le loro zone speciali (polizia, tunnel...) non ci sono ancora:

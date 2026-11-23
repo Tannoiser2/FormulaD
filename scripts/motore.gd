@@ -60,11 +60,14 @@ static func nuova(conf: Dictionary) -> Motore:
 			"pronto": not da_preparare,"i": m.s.auto.size(), "nome": c.nome, "pilota": int(c.pilota), "posto": Dati.PILOTI[int(c.pilota)].posto,
 			"tipo": c.get("tipo", "ia"), "uid": c.get("uid", ""), "c": m.pista.griglia[k], "marcia": 0, "pf": pf, "giro": 0,
 			"ferm": -1, "fuori": false, "perche": "", "posto_arrivo": 0, "testa": false, "max_marcia": 0, "stallo": -1,
-			"mosso": -1, "partito": false, "dado": 0, "tiro_griglia": tiri[k][0] / 100}
+			"mosso": -1, "partito": false, "dado": 0, "tiro_griglia": tiri[k][0] / 100, "pp": int(c.get("pp", 0)), "pq": 0}
 		m.s.auto.append(a)
 		m.s.ordine.append(a.i)
 		testo.append("%d. %s (%d)" % [k + 1, a.nome, a.tiro_griglia])
-	m._msg("Griglia di partenza (dado nero): " + "   ".join(testo), "ordine")
+	if bool(op.get("qualifiche", false)) and conf.auto.size() > 1:
+		m._q_inizia()
+	else:
+		m._msg("Griglia di partenza (dado nero): " + "   ".join(testo), "ordine")
 	if m.s.meteo_on:
 		var r := m._dado_meteo("meteo al via")
 		m.s.meteo = [3, 1, 0][r]
@@ -75,6 +78,10 @@ static func nuova(conf: Dictionary) -> Motore:
 	for a in m.s.auto:
 		via[str(a.i)] = a.c
 	m.s.storia = {"via": via, "mosse": []}
+	if not m.s.has("griglia_via"):
+		m.s.griglia_via = m.s.ordine.duplicate()
+	if conf.has("camp"):
+		m.s.camp = int(conf.camp)
 	m._riordina()
 	return m
 
@@ -635,6 +642,10 @@ func _in_corsa() -> int:
 ## Va avanti finché serve una decisione o la gara è finita.
 func avanza() -> void:
 	var giri_vuoti := 0
+	if s.fase == "qualifiche":
+		_q_avanza()
+		if s.fase == "qualifiche":
+			return
 	if _prepara():
 		return
 	while s.fase == "gara" and s.attesa == null:
@@ -726,6 +737,9 @@ func _assetto(a: Dictionary, az: Dictionary) -> void:
 			parti.append("gomme %s" % Dati.NOMI_GOMME[g].to_lower())
 		a.gomme_tipo = g
 		a.eta = 0
+	if not a.get("pronto", true) and int(a.get("pq", 0)) > 0 and a.pf.has("gomme"):
+		a.pf.gomme = max(1, int(a.pf.gomme) - int(a.pq))
+		parti.append("%d Gomme in meno per le qualifiche" % int(a.pq))
 	a.pronto = true
 	if not parti.is_empty():
 		_msg("%s: %s" % [a.nome, ", ".join(parti)], "info", a.i)
@@ -811,6 +825,30 @@ func applica(az: Dictionary) -> bool:
 			else:
 				_fine_mossa(a)
 		avanza()
+		return true
+	if s.attesa.tipo == "qualifica" and az.get("t") == "qualifica":
+		if not Qualifiche.MARCE.has(int(az.get("m", 0))):
+			return false
+		_q_tira(a, int(az.m))
+		avanza()
+		return true
+	if s.attesa.tipo == "qritira" and az.get("t") == "qritira":
+		_q_ritira(a, bool(az.get("si", false)))
+		avanza()
+		return true
+	if s.attesa.tipo == "mossa" and az.get("t") == "ritira":
+		if int(a.get("pp", 0)) <= 0:
+			return false
+		a.pp -= 1
+		_msg("%s usa un Punto Pilota e ritira il dado (ne restano %d)" % [a.nome, a.pp], "avviso", a.i)
+		var facce: Array = Dati.DADI[a.marcia]
+		var k := rng.randi() % facce.size()
+		var v := int(facce[k][0])
+		a.dado = v
+		eventi.append({"t": "dado", "auto": a.i, "marcia": a.marcia, "valore": v, "faccia": k})
+		_msg("%s ritira e fa %d" % [a.nome, v], "tiro", a.i)
+		s.sforzo = int(Dati.SFORZO.get(a.marcia, 0)) == v and not _in_pit(a)
+		_apri_mossa(a, v)
 		return true
 	if s.attesa.tipo == "mossa" and az.get("t") == "mossa":
 		var cid := str(az.get("c", ""))
@@ -1073,7 +1111,12 @@ func vista() -> Dictionary:
 		v.auto.append({"n": a.nome, "p": a.pilota, "u": a.uid, "tp": a.tipo, "c": a.c, "m": a.marcia, "pf": a.pf, "g": a.giro,
 			"f": a.fuori, "pa": a.posto_arrivo, "t": a.testa, "d": a.dado, "mo": a.mosso == s.turno, "w": a.perche,
 			"dv": a.get("dove", ""), "gt": a.get("gomme_tipo", "dure"), "et": int(a.get("eta", 0)),
-			"ni": s.get("strada", false) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {}), "fs": _fermate_ora(a)})
+			"ni": s.get("strada", false) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {}), "fs": _fermate_ora(a),
+			"pp": int(a.get("pp", 0))})
+	if s.has("q"):
+		v["q"] = s.q
+	if s.has("camp"):
+		v["camp"] = int(s.camp)
 	if s.attesa != null:
 		var a: Dictionary = s.auto[s.attesa.auto]
 		var att := {"tipo": s.attesa.tipo, "auto": a.i, "uid": a.uid}
@@ -1086,6 +1129,9 @@ func vista() -> Dictionary:
 			att.meteo = int(s.get("meteo", -1))
 			if a.tipo == "ia":
 				att.consiglio = assetto_ia(a, att.box)
+		elif s.attesa.tipo == "qualifica" or s.attesa.tipo == "qritira":
+			for k in s.attesa:
+				att[k] = s.attesa[k]
 		elif s.attesa.tipo == "marcia":
 			att.marce = marce(a)
 			att.da = a.c
@@ -1105,8 +1151,175 @@ func vista() -> Dictionary:
 					"fr": o.freno, "ol": o.oltre, "ni": int(o.get("extra", {}).get("ni", 0)), "jk": int(o.get("extra", {}).get("jk", 0)),
 					"pi": int(o.get("extra", {}).get("piu", 0)), "r": snappedf(float(pista.per_id[cid].r), 0.1)})
 			att.opz = l
+			att.pp = int(a.get("pp", 0))
 		v.att = att
 	if s.fase == "fine" and s.has("storia"):
 		v["storia"] = s.storia
 	v["cel"] = [snappedf(pista.cella, 0.1), snappedf(pista.largo_cella, 0.1)]
 	return v
+
+# ------------------------------------------------------------------ qualifiche a settori
+
+func _q_inizia() -> void:
+	var ordine := []
+	for a in s.auto:
+		ordine.append(a.i)
+	# ordine di uscita della prima sessione: a sorte
+	for k in range(ordine.size() - 1, 0, -1):
+		var j := rng.randi_range(0, k)
+		var t = ordine[k]
+		ordine[k] = ordine[j]
+		ordine[j] = t
+	s.fase = "qualifiche"
+	s.q = {"limiti": Qualifiche.limiti(pista), "dim": Qualifiche.sessioni(ordine.size()), "sess": 0, "coda": ordine,
+		"pos": 0, "sett": 0, "giri": {}, "griglia": [], "rit": {}, "rg": {}, "fine": false}
+	_q_nuova_sessione()
+
+func _q_nuova_sessione() -> void:
+	var q: Dictionary = s.q
+	q.pos = 0
+	q.sett = 0
+	q.giri = {}
+	q.rit = {}
+	for i in q.coda:
+		q.giri[str(i)] = {"p": [], "t": [], "m": [], "tot": 0}
+	_msg("%s: %d auto in pista, limiti dei settori %d / %d / %d" % [Qualifiche.nome_sessione(q), q.coda.size(),
+		q.limiti[0], q.limiti[1], q.limiti[2]], "giro")
+
+## Puo' ritirare il dado del settore? Base: una volta per sessione. Avanzate: ogni volta 1 Gomme, al massimo 2.
+func _q_puo_ritirare(a: Dictionary) -> bool:
+	if avanzate():
+		return int(s.q.rg.get(str(a.i), 0)) < 2
+	return int(s.q.rit.get(str(a.i), 0)) < 1
+
+func _q_avanza() -> void:
+	var q: Dictionary = s.q
+	while s.attesa == null and s.fase == "qualifiche":
+		if q.pos >= q.coda.size():
+			_q_fine_sessione()
+			continue
+		var i: int = q.coda[q.pos]
+		var a: Dictionary = s.auto[i]
+		if q.sett >= 3:
+			var g: Dictionary = q.giri[str(i)]
+			_msg("%s: giro da %d punti (%s)" % [a.nome, int(g.tot), " + ".join(PackedStringArray(g.p.map(func(x): return str(x))))], "info", i)
+			q.pos += 1
+			q.sett = 0
+			continue
+		s.attesa = {"tipo": "qualifica", "auto": i, "sett": q.sett, "limite": int(q.limiti[q.sett]),
+			"sessione": Qualifiche.nome_sessione(q), "marce": Qualifiche.valuta(int(q.limiti[q.sett])),
+			"rit": _q_puo_ritirare(a), "fatto": q.giri[str(i)].tot, "meglio": _q_meglio(i)}
+		eventi.append({"t": "tocca", "auto": i})
+
+## Il miglior tempo di questa sessione fra le altre auto (0 se nessuno ha ancora girato).
+func _q_meglio(escluso: int) -> int:
+	var q: Dictionary = s.q
+	var b := 0
+	for k in q.pos:
+		var i: int = q.coda[k]
+		if i != escluso:
+			b = max(b, int(q.giri[str(i)].tot))
+	return b
+
+func _q_tira(a: Dictionary, m: int) -> void:
+	var q: Dictionary = s.q
+	s.attesa = null
+	var facce: Array = Dati.DADI[m]
+	var k := rng.randi() % facce.size()
+	var v := int(facce[k][0])
+	var lim: int = q.limiti[q.sett]
+	var p := Qualifiche.punti(v, lim)
+	eventi.append({"t": "dado", "auto": a.i, "marcia": m, "valore": v, "faccia": k})
+	var testo := "%s, settore %d in %s: tira %d" % [a.nome, q.sett + 1, Dati.NOMI_MARCE[m], v]
+	if p < 0:
+		testo += " - testacoda, 0 punti"
+		if avanzate():
+			a.pq = int(a.get("pq", 0)) + 1
+			testo += " e 1 Gomme in meno per la gara"
+	elif v > lim:
+		testo += " - lungo di %d, %d punti" % [v - lim, p]
+	else:
+		testo += " - %d punti" % p
+	_msg(testo, "tiro", a.i)
+	q["ultimo"] = {"m": m, "v": v, "p": max(0, p)}
+	if _q_puo_ritirare(a) and (p < 0 or v < lim):
+		s.attesa = {"tipo": "qritira", "auto": a.i, "sett": q.sett, "m": m, "tiro": v, "punti": max(0, p),
+			"limite": lim, "sessione": Qualifiche.nome_sessione(q),
+			"costo": "1 punto Gomme per la gara" if avanzate() else "l'unico nuovo tiro di questa sessione",
+			"fatto": q.giri[str(a.i)].tot, "meglio": _q_meglio(a.i), "marce": Qualifiche.valuta(lim)}
+		return
+	_q_segna(a)
+
+func _q_segna(a: Dictionary) -> void:
+	var q: Dictionary = s.q
+	var g: Dictionary = q.giri[str(a.i)]
+	g.p.append(int(q.ultimo.p))
+	g.t.append(int(q.ultimo.v))
+	g.m.append(int(q.ultimo.m))
+	g.tot = int(g.tot) + int(q.ultimo.p)
+	q.sett += 1
+
+func _q_ritira(a: Dictionary, si: bool) -> void:
+	var q: Dictionary = s.q
+	s.attesa = null
+	if not si:
+		_q_segna(a)
+		return
+	q.rit[str(a.i)] = int(q.rit.get(str(a.i), 0)) + 1
+	if avanzate():
+		q.rg[str(a.i)] = int(q.rg.get(str(a.i), 0)) + 1
+		a.pq = int(a.get("pq", 0)) + 1
+	_msg("%s riprova il settore %d%s" % [a.nome, q.sett + 1, " (1 Gomme in meno per la gara)" if avanzate() else ""], "avviso", a.i)
+
+func _q_fine_sessione() -> void:
+	var q: Dictionary = s.q
+	var tiri := {}
+	for i in q.coda:
+		tiri[i] = _nero() * 100 + (99 if chi(s.auto[i], "diane") else rng.randi_range(0, 98))
+	var cl: Array = q.coda.duplicate()
+	cl.sort_custom(func(x, y):
+		var gx: Dictionary = q.giri[str(x)]
+		var gy: Dictionary = q.giri[str(y)]
+		if int(gx.tot) != int(gy.tot):
+			return int(gx.tot) > int(gy.tot)
+		var sx := int(gx.p[2]) if gx.p.size() > 2 else 0
+		var sy := int(gy.p[2]) if gy.p.size() > 2 else 0
+		if sx != sy:
+			return sx > sy
+		return tiri[x] > tiri[y])
+	var nomi := []
+	for k in cl.size():
+		nomi.append("%d. %s %d" % [k + 1, s.auto[cl[k]].nome, int(q.giri[str(cl[k])].tot)])
+	_msg("%s, risultati: %s" % [Qualifiche.nome_sessione(q), "   ".join(nomi)], "ordine")
+	var passa: int = int(q.dim[q.sess + 1]) if q.sess + 1 < q.dim.size() else 0
+	# chi esce prende i posti in fondo (davanti a quelli già eliminati)
+	var fuori := cl.slice(passa)
+	q.griglia = fuori + q.griglia
+	q.sess += 1
+	if passa > 0:
+		var avanti := cl.slice(0, passa)
+		avanti.reverse()   # si gira dall'ultimo al primo
+		q.coda = avanti
+		_q_nuova_sessione()
+		return
+	_q_griglia()
+
+func _q_griglia() -> void:
+	var q: Dictionary = s.q
+	q.fine = true
+	s.griglia_via = q.griglia.duplicate()
+	s.ordine = []
+	var testo := []
+	for k in q.griglia.size():
+		var a: Dictionary = s.auto[q.griglia[k]]
+		a.c = pista.griglia[k]
+		s.storia.via[str(a.i)] = a.c
+		s.ordine.append(a.i)
+		testo.append("%d. %s" % [k + 1, a.nome])
+		# il giro spinto si paga in gomme (le auto da preparare lo pagano dopo l'assetto)
+		if int(a.get("pq", 0)) > 0 and a.get("pronto", true) and a.pf.has("gomme"):
+			a.pf.gomme = max(1, int(a.pf.gomme) - int(a.pq))
+			_msg("%s parte con %d Gomme in meno (qualifiche)" % [a.nome, int(a.pq)], "info", a.i)
+	_msg("Griglia di partenza (qualifiche): " + "   ".join(testo), "ordine")
+	s.fase = "gara"
+	eventi.append({"t": "griglia"})

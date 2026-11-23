@@ -82,6 +82,7 @@ if (OSPITE) {
 }
 const t0 = Date.now();
 let fotoAssetto = false;
+let fotoQual = false;
 let fatte = 0, fotoMarcia = false, fotoMossa = false, fotoOspite = 0, fine = false, fotoAnte = 0;
 while (Date.now() - t0 < DURATA && !fine) {
   await tv.waitForTimeout(700);
@@ -91,7 +92,14 @@ while (Date.now() - t0 < DURATA && !fine) {
     if (!s) continue;
     if (s.fase === 'fine') { fine = true; break; }
     if (!s.att || !s.tocca) continue;
-    if (s.att.tipo === 'assetto') {
+    if (s.att.tipo === 'qualifica') {
+      if (!fotoQual) { await foto(p, 'tel_0_qualifica'); fotoQual = true; }
+      await p.locator('[data-qm]').nth(1).click();
+      fatte++;
+    } else if (s.att.tipo === 'qritira') {
+      await p.click('[data-qr="0"]');
+      fatte++;
+    } else if (s.att.tipo === 'assetto') {
       // tocchi veri: un punto spostato (se l'assetto è libero), le gomme, poi conferma
       if (s.att.libero) { await p.click('[data-z="tenuta"][data-d="-1"]'); await p.click('[data-z="gomme"][data-d="1"]'); }
       const g = p.locator('[data-g]');

@@ -31,6 +31,8 @@ var b_editor_export: Button
 var b_cronaca: Button
 var b_scritte: Button
 var titolo_ordine: Label
+var campionato: Dictionary = {}     # il campionato in corso (vuoto se è una gara singola)
+var riepilogo_gp: Array = []
 var p_ass: PanelContainer
 var ass_box: VBoxContainer
 var scritte_icone := func() -> bool: return true   # chiede al tabellone come sono scritte le caselle
@@ -242,8 +244,16 @@ func aggiorna(vista: Dictionary, mie: Array) -> void:
 		giro_max = max(giro_max, int(a.g))
 	var info := "%s%s  -  Turno %d  -  Giro %d di %d" % [Dati.NOMI_REGOLE[v.regole], "  -  Su strada" if v.get("str", false) else "",
 		int(v.turno), clamp(giro_max, 1, int(v.giri)), int(v.giri)]
+	if str(v.fase) == "qualifiche" and v.has("q"):
+		var q: Dictionary = v.q
+		info = "%s  -  settori %d / %d / %d" % [Qualifiche.nome_sessione(q), int(q.limiti[0]), int(q.limiti[1]), int(q.limiti[2])]
+	if not campionato.is_empty() and v.has("camp"):
+		info = "GP %d di %d  -  " % [int(v.camp) + 1, campionato.piste.size()] + info
 	barra_info.text = info
-	_classifica()
+	if str(v.fase) == "qualifiche":
+		_classifica_qualifiche()
+	else:
+		_classifica()
 	# la plancia: quella dell'auto di turno se è mia, altrimenti la mia (o quella di turno)
 	var chi := -1
 	if v.att != null and _mio(int(v.att.auto)):
@@ -445,6 +455,9 @@ func chiedi() -> void:
 	if v.att.tipo == "assetto":
 		_chiedi_assetto(i, a, col)
 		return
+	if v.att.tipo == "qualifica" or v.att.tipo == "qritira":
+		_chiedi_qualifica(a, col)
+		return
 	if v.att.tipo == "marcia":
 		# le marce si scelgono sulla plancia; qui solo il titolo e il riassunto della marcia sotto il puntatore
 		azione.add_child(UI.testo("%s: scegli la marcia" % a.n, 32, col, true))
@@ -455,6 +468,11 @@ func chiedi() -> void:
 	if v.att.tipo == "mossa":
 		azione.add_child(UI.testo("%s: tiro %d in %s" % [a.n, int(v.att.tiro), Dati.NOMI_MARCE[int(a.m)]], 32, col, true))
 		azione.add_child(UI.testo("Clicca una casella per vedere quanto avanzi e quanto costa, riclicca per confermare.", 22, UI.CHIARO, false, LARG_DX - 40))
+		if int(v.att.get("pp", 0)) > 0:
+			var bpp := UI.bottone("Ritira il dado (Punti Pilota: %d)" % int(v.att.pp), 20, Color(0.45, 0.1, 0.38), 330, 40)
+			bpp.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			bpp.pressed.connect(func(): decisione.emit({"t": "ritira"}))
+			azione.add_child(bpp)
 
 ## La riga sotto la plancia mentre si sceglie la marcia.
 func _info_marcia() -> void:
@@ -704,7 +722,11 @@ func mostra_fine() -> void:
 		vb.add_child(h)
 	var hb := UI.riga(20)
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
-	if not ospite:
+	if not ospite and not campionato.is_empty():
+		var bc := UI.bottone("Classifica del campionato", 30, Color(0.1, 0.6, 0.2), 380, 60)
+		bc.pressed.connect(mostra_campionato)
+		hb.add_child(bc)
+	elif not ospite:
 		var b1 := UI.bottone("Nuova gara", 30, Color(0.1, 0.6, 0.2), 260, 60)
 		b1.pressed.connect(func(): comando.emit("rivincita"))
 		hb.add_child(b1)
@@ -785,3 +807,174 @@ class Pallini extends Control:
 				draw_circle(c, 5.5, Color(1, 0.85, 0.15) if k < int(fermate[1]) else Color(0.6, 0.9, 0.6))
 			else:
 				draw_arc(c, 5.0, 0, TAU, 20, Color(1, 0.85, 0.15), 1.6, true)
+
+# ------------------------------------------------------------------ qualifiche
+
+func _chiedi_qualifica(a: Dictionary, col: Color) -> void:
+	var att: Dictionary = v.att
+	var sett := int(att.sett) + 1
+	if att.tipo == "qritira":
+		azione.add_child(UI.testo("%s: settore %d, %d punti" % [a.n, sett, int(att.punti)], 30, col, true))
+		azione.add_child(UI.testo("Hai tirato %d in %s (limite %d). Vuoi riprovare il settore? Costa %s." % [int(att.tiro),
+			Dati.NOMI_MARCE[int(att.m)], int(att.limite), att.costo], 22, UI.CHIARO, false, LARG_DX - 40))
+		var h := UI.riga(10)
+		azione.add_child(h)
+		var b1 := UI.bottone("Tengo %d punti" % int(att.punti), 22, Color(0.1, 0.6, 0.2), 220, 50)
+		b1.pressed.connect(func(): decisione.emit({"t": "qritira", "si": false}))
+		h.add_child(b1)
+		var b2 := UI.bottone("Riprovo", 22, UI.ROSSO, 180, 50)
+		b2.pressed.connect(func(): decisione.emit({"t": "qritira", "si": true}))
+		h.add_child(b2)
+		return
+	azione.add_child(UI.testo("%s  -  %s: settore %d" % [str(att.sessione), a.n, sett], 26, col, true))
+	var t := "Limite %d  -  finora %d punti%s" % [int(att.limite), int(att.fatto), ", il migliore %d" % int(att.meglio) if int(att.meglio) > 0 else ""]
+	azione.add_child(UI.testo(t, 20, UI.CHIARO, false, LARG_DX - 40))
+	var g := UI.riga(6)
+	azione.add_child(g)
+	for o in att.marce:
+		var m := int(o.m)
+		var testo_b := "%s  %d-%d\nmedia %s%s" % [Dati.NOMI_MARCE[m], int(o.min), int(o.max), str(o.media).replace(".", ","),
+			"\ntestacoda %d%%" % int(o.tc) if int(o.tc) > 0 else ""]
+		var b := UI.bottone(testo_b, 17, Dati.COLORI_MARCE[m].darkened(0.35), (LARG_DX - 58) / 4.0, 78)
+		b.pressed.connect(func(): decisione.emit({"t": "qualifica", "m": m}))
+		g.add_child(b)
+
+## Durante le qualifiche, al posto dell'ordine di gioco: i tempi della sessione e chi è già fuori.
+func _classifica_qualifiche() -> void:
+	for c in lista.get_children():
+		c.queue_free()
+	var q: Dictionary = v.q
+	titolo_ordine.text = "%s  -  TEMPI" % Qualifiche.nome_sessione(q).to_upper()
+	var di_turno := int(v.att.auto) if v.att != null else -1
+	var righe := []
+	for k in q.coda.size():
+		var i := int(q.coda[k])
+		var g: Dictionary = q.giri[str(i)]
+		righe.append({"i": i, "tot": int(g.tot), "p": g.p, "fatto": k < int(q.pos), "ora": k == int(q.pos)})
+	righe.sort_custom(func(x, y):
+		if x.fatto != y.fatto:
+			return x.fatto
+		if x.fatto:
+			return x.tot > y.tot
+		return false)
+	var passa: int = int(q.dim[int(q.sess) + 1]) if int(q.sess) + 1 < q.dim.size() else 1
+	var n := 0
+	for r in righe:
+		n += 1
+		var a: Dictionary = v.auto[int(r.i)]
+		var sf := UI.FONDO2 if int(r.i) != di_turno else Color(0.45, 0.08, 0.1)
+		var pr := UI.pannello(sf, UI.GIALLO if int(r.i) == di_turno else sf, 8, 2, 2)
+		var h := UI.riga(8)
+		pr.add_child(h)
+		h.add_child(UI.chip(Dati.colore_auto(int(a.p)), Vector2(12, 26)))
+		var nome := UI.testo(str(a.n), 22, UI.CHIARO)
+		nome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(nome)
+		var sett := []
+		for x in r.p:
+			sett.append(str(x))
+		var ls := UI.testo(" + ".join(PackedStringArray(sett)) if not sett.is_empty() else ("in pista" if r.ora else "-"), 20, UI.GRIGIO)
+		ls.custom_minimum_size.x = 120
+		h.add_child(ls)
+		var lt := UI.testo(str(r.tot) if r.fatto or r.ora else "", 22, UI.GIALLO if r.fatto and n <= passa and q.dim.size() > int(q.sess) + 1 else UI.CHIARO, true)
+		lt.custom_minimum_size.x = 40
+		lt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		h.add_child(lt)
+		lista.add_child(pr)
+	if not q.griglia.is_empty():
+		var fuori := []
+		var base: int = v.auto.size() - q.griglia.size()
+		for k in q.griglia.size():
+			fuori.append("%d. %s" % [base + k + 1, str(v.auto[int(q.griglia[k])].n).split(" ")[0]])
+		lista.add_child(UI.testo("Già in griglia: " + ", ".join(PackedStringArray(fuori)), 18, UI.GRIGIO, false, LARG_DX - 30))
+
+# ------------------------------------------------------------------ campionato
+
+func mostra_campionato() -> void:
+	var c := campionato
+	var finito: bool = c.get("finito", false)
+	var vb := _apri_velo("CAMPIONATO FINITO" if finito else "CAMPIONATO  -  DOPO %d GP DI %d" % [int(c.gp), c.piste.size()], 1500)
+	if finito:
+		var cl := Campionato.piloti(c)
+		var sc := Campionato.scuderie(c)
+		var lc := UI.testo("Campione del mondo: %s (%d punti)   -   Scuderia campione: %s" % [cl[0].n, int(cl[0].punti), str(sc[0].s).capitalize()], 28, UI.GIALLO, true)
+		lc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vb.add_child(lc)
+	var h := UI.riga(24)
+	vb.add_child(h)
+	# la gara appena corsa
+	if not riepilogo_gp.is_empty():
+		var vg := _tabella(h, "QUESTO GRAN PREMIO", 430)
+		for r in riepilogo_gp:
+			var pos := "%d°" % int(r.pos) if int(r.pos) > 0 else "rit."
+			_riga_tab(vg, int(r.p), pos, str(r.n), "+%d" % int(r.punti) if int(r.punti) > 0 else "",
+				"%+d" % int(r.vill) if int(r.vill) != 0 else "")
+	var vp := _tabella(h, "PILOTI  (punti, Punti Pilota)", 470)
+	var k := 0
+	for r in Campionato.piloti(c):
+		k += 1
+		_riga_tab(vp, int(r.p), "%d." % k, str(r.n), str(r.punti), "PP %d" % int(r.pp))
+	var v2 := UI.colonna(18)
+	h.add_child(v2)
+	var vs := _tabella(v2, "SCUDERIE", 470)
+	k = 0
+	for r in Campionato.scuderie(c):
+		k += 1
+		var hs := UI.riga(8)
+		hs.add_child(UI.testo("%d." % k, 22, UI.GRIGIO))
+		var ln := UI.testo("%s  (%s)" % [str(r.s).capitalize(), r.piloti], 22, UI.CHIARO)
+		ln.custom_minimum_size.x = 360
+		ln.clip_text = true
+		hs.add_child(ln)
+		hs.add_child(UI.testo(str(r.punti), 22, UI.GIALLO, true))
+		vs.add_child(hs)
+	var vv := _tabella(v2, "PREMIO GILLES VILLENEUVE", 470)
+	k = 0
+	for r in Campionato.villeneuve(c):
+		k += 1
+		if k > 5:
+			break
+		_riga_tab(vv, int(r.p), "%d." % k, str(r.n), "%+d" % int(r.vill) if int(r.vill) != 0 else "0", "")
+	var hb := UI.riga(20)
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(hb)
+	if not finito:
+		var bn := UI.bottone("Prossimo GP: %s" % Campionato.nome_pista(c.piste[int(c.gp)]), 30, Color(0.1, 0.6, 0.2), 460, 60)
+		bn.pressed.connect(func(): comando.emit("camp_prossimo"))
+		hb.add_child(bn)
+	var b2 := UI.bottone("Guarda il tabellone", 26, UI.FONDO2, 280, 60)
+	b2.pressed.connect(chiudi_velo)
+	hb.add_child(b2)
+	var b3 := UI.bottone("Menu principale", 26, UI.ROSSO, 260, 60)
+	b3.pressed.connect(func(): comando.emit("esci"))
+	hb.add_child(b3)
+
+func _tabella(dove: Control, titolo: String, larg: float) -> VBoxContainer:
+	var p := UI.pannello(UI.FONDO2, UI.FONDO2, 10, 1, 10)
+	p.custom_minimum_size.x = larg
+	dove.add_child(p)
+	var vb := UI.colonna(4)
+	p.add_child(vb)
+	vb.add_child(UI.testo(titolo, 22, UI.GIALLO, true))
+	return vb
+
+func _riga_tab(vb: VBoxContainer, pilota: int, pos: String, nome: String, a: String, b: String) -> void:
+	var h := UI.riga(8)
+	var lp := UI.testo(pos, 22, UI.GRIGIO)
+	lp.custom_minimum_size.x = 44
+	h.add_child(lp)
+	h.add_child(UI.chip(Dati.colore_auto(pilota), Vector2(10, 24)))
+	var ln := UI.testo(nome, 22, UI.CHIARO)
+	ln.custom_minimum_size.x = 220
+	ln.clip_text = true
+	ln.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(ln)
+	var la := UI.testo(a, 22, UI.GIALLO, true)
+	la.custom_minimum_size.x = 50
+	la.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	h.add_child(la)
+	var lb := UI.testo(b, 20, UI.GRIGIO)
+	lb.custom_minimum_size.x = 56
+	lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	h.add_child(lb)
+	vb.add_child(h)

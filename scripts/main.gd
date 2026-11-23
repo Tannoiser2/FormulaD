@@ -53,6 +53,7 @@ func _ready() -> void:
 	_applica_traiettorie_salvate(prima)
 	mondo.carica_pista(prima)
 	menu.ha_salvataggio = rete.carica("fd_gara") != ""
+	_carica_campionato()
 	mondo.segui = rete.carica("fd_segui") != "0"
 	mondo.scritte_icone = rete.carica("fd_scritte") != "parole"
 	hud.scritte_icone = func() -> bool: return mondo.scritte_icone
@@ -72,6 +73,7 @@ func _ready() -> void:
 		menu.strada = par.has("strada")
 		menu.meteo = par.has("meteo")
 		menu.libero = par.has("libero")
+		menu.qualifiche = par.has("qualifiche")
 		menu._voce("stanza_online" if par.has("online") else "stanza_tv")
 		if par.has("online"):
 			menu.posti[0].tipo = "ia"   # nelle prove nessuno guida da questo computer
@@ -86,7 +88,7 @@ func _ready() -> void:
 			lista.append({"nome": Dati.PILOTI[i].nome, "pilota": i, "tipo": "ia", "uid": ""})
 		_via({"regole": str(par.get("regole", "avanzate")), "pista": str(par.get("pista", "FDMonaco")), "giri": int(par.get("giri", 1)),
 			"auto": lista, "livello": 1, "stanza": false,
-			"opzioni": {"strada": par.has("strada"), "meteo": par.has("meteo"), "libero": par.has("libero")}})
+			"opzioni": {"strada": par.has("strada"), "meteo": par.has("meteo"), "libero": par.has("libero"), "qualifiche": par.has("qualifiche")}})
 
 # ------------------------------------------------------------------ comandi
 
@@ -206,6 +208,12 @@ func _comando(cosa: String) -> void:
 				_via(_ultima_conf)
 		"esci":
 			_al_menu()
+		"camp_continua":
+			_carica_campionato()
+			_gp()
+		"camp_prossimo":
+			hud.chiudi_velo()
+			_gp()
 		"apri_stanza":
 			_stanza_chiesta = true
 			rete.avvia()
@@ -245,12 +253,53 @@ func _al_menu() -> void:
 	mondo.vista_generale()
 	menu.visible = true
 	menu.ha_salvataggio = rete.carica("fd_gara") != ""
+	_carica_campionato()
 	menu.principale()
+
+# ------------------------------------------------------------------ campionato
+
+var camp: Dictionary = {}
+
+func _carica_campionato() -> void:
+	var d = str_to_var(rete.carica("fd_campionato"))
+	camp = d if d is Dictionary and d.has("piste") else {}
+	menu.camp_salvato = ""
+	if not camp.is_empty() and not camp.finito:
+		menu.camp_salvato = "Gran Premio %d di %d: %s" % [int(camp.gp) + 1, camp.piste.size(), Campionato.nome_pista(camp.piste[int(camp.gp)])]
+
+func _salva_campionato() -> void:
+	rete.salva("fd_campionato", var_to_str(camp))
+
+## Il Gran Premio corrente del campionato.
+func _gp() -> void:
+	if camp.is_empty() or camp.finito:
+		_al_menu()
+		return
+	_via(Campionato.conf_gp(camp))
+	hud.cronaca("Campionato: Gran Premio %d di %d, %s" % [int(camp.gp) + 1, camp.piste.size(), Campionato.nome_pista(camp.piste[int(camp.gp)])], "giro")
+
+## A gara finita: se è un GP del campionato si aggiornano le classifiche (una volta sola).
+func _fine_gp() -> void:
+	if motore == null or not motore.s.has("camp") or camp.is_empty():
+		return
+	if int(motore.s.camp) != int(camp.gp):
+		return
+	var rie := Campionato.registra(camp, motore.s)
+	_salva_campionato()
+	hud.riepilogo_gp = rie
 
 # ------------------------------------------------------------------ gara (chi ospita o in locale)
 
 func _via(conf: Dictionary) -> void:
+	if conf.has("campionato"):
+		camp = Campionato.nuovo(conf)
+		_salva_campionato()
+		_gp()
+		return
 	_ultima_conf = conf
+	hud.campionato = {}
+	if conf.has("camp"):
+		hud.campionato = camp
 	livello = int(conf.get("livello", 1))
 	modo = "stanza" if conf.get("stanza", false) else "locale"
 	_applica_traiettorie_salvate(Pista.carica(str(conf.pista)))
@@ -303,6 +352,7 @@ func _ciclo() -> void:
 		if m.s.fase == "fine":
 			mondo.togli_opzioni()
 			hud.chiedi()
+			_fine_gp()
 			rete.salva("fd_gara", "")
 			if not auto_prova:
 				hud.mostra_fine()
@@ -400,7 +450,7 @@ func _casella_mappa(cid: String) -> void:
 		var esiste: bool = Array(mondo.pista.per_id[_editor_da].get("n", [])).has(_editor_a)
 		var nuova: bool = _editor_da != _editor_a and not esiste
 		hud.segna_editor(true, nuova, esiste)
-		hud.cronaca("Editor: %s → %s (%s). Premi %s." % [_editor_da, _editor_a, "bianca" if stessa else "rossa", "Elimina" if esiste else "Aggiungi"], "ordine")
+		hud.cronaca("Editor: %s > %s (%s). Premi %s." % [_editor_da, _editor_a, "bianca" if stessa else "rossa", "Elimina" if esiste else "Aggiungi"], "ordine")
 
 func _chiudi_editor() -> void:
 	_editor = false
@@ -437,7 +487,7 @@ func _aggiungi_traiettoria() -> void:
 		return
 	var p := mondo.pista
 	if not p.aggiungi_collegamento(_editor_da, _editor_a):
-		hud.cronaca("La traiettoria %s → %s esiste già oppure non è valida." % [_editor_da, _editor_a], "avviso")
+		hud.cronaca("La traiettoria %s > %s esiste già oppure non è valida." % [_editor_da, _editor_a], "avviso")
 		return
 	var coppia := [_editor_da, _editor_a]
 	var chiave_rimosse := _chiave_editor_rimosse(p.id)
@@ -457,7 +507,7 @@ func _aggiungi_traiettoria() -> void:
 		if not lista.has(coppia):
 			lista.append(coppia)
 		rete.salva(chiave, JSON.stringify(lista))
-	hud.cronaca("Traiettoria %s → %s aggiunta per sempre a %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
+	hud.cronaca("Traiettoria %s > %s aggiunta per sempre a %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
 	_editor_da = ""
 	_editor_a = ""
 	mondo.mostra_mappa(true)
@@ -468,7 +518,7 @@ func _elimina_traiettoria() -> void:
 		return
 	var p := mondo.pista
 	if not p.elimina_collegamento(_editor_da, _editor_a):
-		hud.cronaca("La traiettoria %s → %s non esiste." % [_editor_da, _editor_a], "avviso")
+		hud.cronaca("La traiettoria %s > %s non esiste." % [_editor_da, _editor_a], "avviso")
 		return
 	var coppia := [_editor_da, _editor_a]
 	# Se era stata aggiunta con l'editor, basta annullare l'aggiunta.
@@ -488,7 +538,7 @@ func _elimina_traiettoria() -> void:
 		if not rimosse.has(coppia):
 			rimosse.append(coppia)
 		rete.salva(chiave_rimosse, JSON.stringify(rimosse))
-	hud.cronaca("Traiettoria %s → %s eliminata e salvata per %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
+	hud.cronaca("Traiettoria %s > %s eliminata e salvata per %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
 	_editor_da = ""
 	_editor_a = ""
 	mondo.mostra_mappa(true)
@@ -607,6 +657,8 @@ func _riprendi() -> void:
 		return
 	motore = m
 	livello = int(d.get("livello", 1))
+	_carica_campionato()
+	hud.campionato = camp if m.s.has("camp") else {}
 	modo = "stanza" if d.get("stanza", false) else "locale"
 	menu.tipo_stanza = str(d.get("sk", "tv"))
 	_apri_gara()
@@ -818,6 +870,12 @@ func _ciclo_ospite() -> void:
 
 ## Prove: l'ospite sceglie la marcia più alta che non costa (fino alla 4a) e la casella meno cara e più lontana.
 func _guida_da_solo(att: Dictionary) -> void:
+	if str(att.tipo) == "qualifica":
+		_decisione({"t": "qualifica", "m": 4})
+		return
+	if str(att.tipo) == "qritira":
+		_decisione({"t": "qritira", "si": false})
+		return
 	if str(att.tipo) == "assetto":
 		var az := {"t": "assetto", "g": str(att.gomme[att.gomme.size() - 1])}
 		if att.libero:

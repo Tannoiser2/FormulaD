@@ -21,12 +21,12 @@ func _init() -> void:
 			lista.append({"nome": Dati.PILOTI[i].nome, "pilota": i, "tipo": "umano" if (i == 0 and g % 2 == 1) else "ia"})
 		var opzioni := {}
 		if varianti != "":
-			opzioni = [{}, {"meteo": true, "libero": true}, {"strada": true}, {"strada": true, "meteo": true}][g % 4]
+			opzioni = [{"qualifiche": true}, {"meteo": true, "libero": true, "qualifiche": true}, {"strada": true}, {"strada": true, "meteo": true}][g % 4]
 		var m := Motore.nuova({"regole": regole, "pista": pid, "giri": 1 + g % 2 + (1 if varianti != "" and g % 3 == 0 else 0),
 			"auto": lista, "seme": 1000 + g, "opzioni": opzioni})
 		m.avanza()
 		var passi := 0
-		while m.s.fase == "gara" and passi < 5000:
+		while (m.s.fase == "gara" or m.s.fase == "qualifiche") and passi < 6000:
 			passi += 1
 			if m.s.attesa == null:
 				print("ERRORE: gara ferma senza attesa (gara %d)" % g)

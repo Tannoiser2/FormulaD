@@ -22,6 +22,10 @@ var livello := 1
 var strada := false
 var meteo := false
 var libero := false
+var qualifiche := false
+var campionato := false
+var camp_piste: Array = []      # i circuiti scelti per il campionato, nell'ordine in cui si corrono
+var camp_salvato := ""          # riassunto del campionato in corso (vuoto se non ce n'è)
 var posti: Array = []        # per pilota: {tipo, uid, nome}
 var codice := ""
 var url := ""
@@ -86,18 +90,23 @@ func principale() -> void:
 		["GARA ONLINE", "Ognuno gioca dal suo computer e vede la stessa gara: apri la gara e dai il codice", "stanza_online", Color(0.15, 0.35, 0.6)],
 		["ENTRA IN UNA GARA ONLINE", "Gioca da questo computer in una gara online aperta da un altro", "entra", Color(0.12, 0.45, 0.5)],
 	]
+	voci.insert(1, ["CAMPIONATO", "Più Gran Premi di fila con qualifiche, punti, scuderie e Punti Pilota", "campionato", Color(0.55, 0.12, 0.45)])
+	if camp_salvato != "":
+		voci.insert(2, ["CONTINUA IL CAMPIONATO", camp_salvato, "camp_continua", Color(0.45, 0.1, 0.38)])
 	if ha_salvataggio:
 		voci.append(["RIPRENDI LA GARA SALVATA", "Continua dall'ultimo turno", "riprendi", Color(0.1, 0.55, 0.2)])
 	voci.append(["REGOLE", "Il regolamento in breve, in italiano", "regole", UI.FONDO2])
 	for vo in voci:
-		var b := UI.bottone(vo[0], 36, vo[3], 760, 66)
+		var voce := UI.colonna(2)
+		vb.add_child(voce)
+		var b := UI.bottone(vo[0], 32, vo[3], 760, 54)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		var cosa: String = vo[2]
 		b.pressed.connect(func(): _voce(cosa))
-		vb.add_child(b)
-		var d := UI.testo(vo[1], 22, UI.GRIGIO)
+		voce.add_child(b)
+		var d := UI.testo(vo[1], 20, UI.GRIGIO)
 		d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		vb.add_child(d)
+		voce.add_child(d)
 	if avviso != "":
 		var a := UI.testo(avviso, 24, UI.GIALLO, false, 900)
 		a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -108,9 +117,21 @@ func _voce(cosa: String) -> void:
 	match cosa:
 		"locale":
 			stanza = false
+			campionato = false
 			_posti_iniziali()
 			preparazione()
+		"campionato":
+			stanza = false
+			campionato = true
+			if camp_piste.is_empty():
+				camp_piste = ["FDMonaco", "FDe04", "FDe19", "FDAustin", "FDe01"]
+			giri = 3
+			_posti_iniziali()
+			preparazione()
+		"camp_continua":
+			comando.emit("camp_continua")
 		"stanza", "stanza_tv", "stanza_online":
+			campionato = false
 			tipo_stanza = "online" if cosa == "stanza_online" else "tv"
 			if not in_rete:
 				avviso = "Le stanze funzionano dalla versione web del gioco (GitHub Pages)."
@@ -142,7 +163,7 @@ func _scelta(etichetta: String, valori: Array, attuale, quando: Callable) -> HBo
 
 func preparazione() -> void:
 	var vb := _nuovo_corpo()
-	var t := UI.testo("PREPARA LA GARA" if not stanza else ("TV + TELEFONI" if tipo_stanza == "tv" else "GARA ONLINE"), 60, UI.ROSSO, true)
+	var t := UI.testo("CAMPIONATO" if campionato else "PREPARA LA GARA" if not stanza else ("TV + TELEFONI" if tipo_stanza == "tv" else "GARA ONLINE"), 60, UI.ROSSO, true)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(t)
 	var h := UI.riga(24)
@@ -153,46 +174,25 @@ func preparazione() -> void:
 	h.add_child(ps)
 	var vs := UI.colonna(10)
 	ps.add_child(vs)
-	var pid: String = Dati.PISTE[pista_n]
-	var p := Pista.carica(pid)
-	var hc := UI.riga(8)
-	var bp := UI.bottone("<", 34, UI.FONDO2, 54, 54)
-	bp.pressed.connect(func():
-		pista_n = (pista_n + Dati.PISTE.size() - 1) % Dati.PISTE.size()
-		preparazione())
-	hc.add_child(bp)
-	var ln := UI.testo(p.nome, 34, UI.CHIARO, true)
-	# i nomi lunghi si rimpiccioliscono invece di essere tagliati
-	var dim_nome := 34
-	while dim_nome > 16 and UI.f_titolo.get_string_size(p.nome, HORIZONTAL_ALIGNMENT_LEFT, -1, dim_nome).x > 400.0:
-		dim_nome -= 2
-	ln.add_theme_font_size_override("font_size", dim_nome)
-	ln.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ln.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ln.clip_text = true
-	ln.custom_minimum_size.x = 380
-	hc.add_child(ln)
-	var bn := UI.bottone(">", 34, UI.FONDO2, 54, 54)
-	bn.pressed.connect(func():
-		pista_n = (pista_n + 1) % Dati.PISTE.size()
-		preparazione())
-	hc.add_child(bn)
-	vs.add_child(hc)
-	var alt := 170.0 if stanza else 250.0
-	vs.add_child(UI.immagine("res://assets/piste/mini/%s.webp" % pid, Vector2(530, alt)))
-	var curve := 0
-	for c in p.fermate:
-		curve += 1
-	vs.add_child(UI.testo("%d curve  -  circuito %d di %d" % [curve, pista_n + 1, Dati.PISTE.size()], 22, UI.GRIGIO))
+	if campionato:
+		_scegli_circuiti(vs)
+	else:
+		_scegli_pista(vs)
 	vs.add_child(_scelta("Giri", [["1", 1], ["2", 2], ["3", 3]], giri, func(x):
 		giri = x
 		preparazione()))
 	vs.add_child(_scelta("Regole", [["Base", "base"], ["Avanzate", "avanzate"]], regole, func(x):
 		regole = x
 		preparazione()))
-	vs.add_child(_scelta("Gara", [["In circuito", false], ["Su strada", true]], strada, func(x):
-		strada = x
-		preparazione()))
+	if not campionato:
+		vs.add_child(_scelta("Gara", [["In circuito", false], ["Su strada", true]], strada, func(x):
+			strada = x
+			preparazione()))
+		vs.add_child(_scelta("Griglia", [["Dado nero", false], ["Qualifiche", true]], qualifiche, func(x):
+			qualifiche = x
+			preparazione()))
+	else:
+		strada = false
 	if regole == "avanzate":
 		vs.add_child(_scelta("Meteo", [["Sereno", false], ["Dado nero", true]], meteo, func(x):
 			meteo = x
@@ -204,8 +204,13 @@ func preparazione() -> void:
 	vs.add_child(_scelta("Computer", [["Prudente", 0], ["Normale", 1], ["Esperto", 2]], livello, func(x):
 		livello = x
 		preparazione()))
-	var nota := "Base: 18 Punti Struttura per tutto. Avanzate: gomme, freni, cambio, carrozzeria, motore, tenuta di strada, scie e detriti."
-	if strada:
+	var nota0 := "Base: 18 Punti Struttura per tutto. Avanzate: gomme, freni, cambio, carrozzeria, motore, tenuta di strada, scie e detriti."
+	var nota := nota0
+	if campionato:
+		nota = "Prima di ogni GP le qualifiche a settori. Punti 8-6-4-2-1, classifica scuderie e premio Villeneuve. Ogni pilota ha 1 Punto Pilota per ritirare il dado, +1 per i primi tre di ogni GP."
+	elif qualifiche and not strada:
+		nota = "Qualifiche a settori: 3 tiri a giro, Q1-Q2-Q3 con 8 auto o più. " + nota0
+	elif strada:
 		nota = "Su strada: niente box, Nitro una volta per giro, controllo al traguardo." + (" Ogni pilota ha la sua auto e un'abilità." if regole == "avanzate" else "")
 	elif regole == "avanzate" and (meteo or libero):
 		nota = ("Il dado nero decide il tempo e si scelgono le gomme. " if meteo else "") + ("Ognuno ripartisce 20 punti fra le zone." if libero else "")
@@ -260,10 +265,66 @@ func preparazione() -> void:
 		principale())
 	hb.add_child(bi)
 	var n := _quante()
-	var bv := UI.bottone("VIA!  (%d auto)" % n, 40, Color(0.1, 0.6, 0.2), 420, 64)
-	bv.disabled = n < 1 or (stanza and codice == "")
+	var bv := UI.bottone(("VIA AL CAMPIONATO!  (%d auto)" if campionato else "VIA!  (%d auto)") % n, 40, Color(0.1, 0.6, 0.2), 520 if campionato else 420, 64)
+	bv.disabled = n < 1 or (stanza and codice == "") or (campionato and (camp_piste.is_empty() or n < 2))
 	bv.pressed.connect(_via)
 	hb.add_child(bv)
+
+func _scegli_pista(vs: VBoxContainer) -> void:
+	var pid: String = Dati.PISTE[pista_n]
+	var p := Pista.carica(pid)
+	var hc := UI.riga(8)
+	var bp := UI.bottone("<", 34, UI.FONDO2, 54, 54)
+	bp.pressed.connect(func():
+		pista_n = (pista_n + Dati.PISTE.size() - 1) % Dati.PISTE.size()
+		preparazione())
+	hc.add_child(bp)
+	var ln := UI.testo(p.nome, 34, UI.CHIARO, true)
+	# i nomi lunghi si rimpiccioliscono invece di essere tagliati
+	var dim_nome := 34
+	while dim_nome > 16 and UI.f_titolo.get_string_size(p.nome, HORIZONTAL_ALIGNMENT_LEFT, -1, dim_nome).x > 400.0:
+		dim_nome -= 2
+	ln.add_theme_font_size_override("font_size", dim_nome)
+	ln.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ln.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ln.clip_text = true
+	ln.custom_minimum_size.x = 380
+	hc.add_child(ln)
+	var bn := UI.bottone(">", 34, UI.FONDO2, 54, 54)
+	bn.pressed.connect(func():
+		pista_n = (pista_n + 1) % Dati.PISTE.size()
+		preparazione())
+	hc.add_child(bn)
+	vs.add_child(hc)
+	var alt := 130.0 if stanza else 210.0
+	vs.add_child(UI.immagine("res://assets/piste/mini/%s.webp" % pid, Vector2(530, alt)))
+	var curve := 0
+	for c in p.fermate:
+		curve += 1
+	vs.add_child(UI.testo("%d curve  -  circuito %d di %d" % [curve, pista_n + 1, Dati.PISTE.size()], 22, UI.GRIGIO))
+
+## Campionato: i circuiti si accendono e spengono; si corrono nell'ordine in cui sono stati scelti.
+func _scegli_circuiti(vs: VBoxContainer) -> void:
+	vs.add_child(UI.testo("CIRCUITI  -  %d Gran Premi (si corrono nell'ordine scelto)" % camp_piste.size(), 22, UI.GIALLO, false, 520))
+	var g := GridContainer.new()
+	g.columns = 3
+	g.add_theme_constant_override("h_separation", 6)
+	g.add_theme_constant_override("v_separation", 5)
+	vs.add_child(g)
+	for pid in Dati.PISTE:
+		var k := camp_piste.find(pid)
+		var nome := Campionato.nome_pista(pid)
+		var etichetta := ("%d. " % (k + 1) if k >= 0 else "") + nome
+		var b := UI.bottone(etichetta, 18 if etichetta.length() <= 17 else 15, UI.ROSSO if k >= 0 else UI.FONDO2, 170, 34)
+		b.clip_text = true
+		var id: String = pid
+		b.pressed.connect(func():
+			if camp_piste.has(id):
+				camp_piste.erase(id)
+			else:
+				camp_piste.append(id)
+			preparazione())
+		g.add_child(b)
 
 func _quante() -> int:
 	var n := 0
@@ -360,8 +421,12 @@ func _via() -> void:
 	if lista.is_empty():
 		return
 	var av := regole == "avanzate"
-	via.emit({"regole": regole, "pista": Dati.PISTE[pista_n], "giri": giri, "auto": lista, "livello": livello, "stanza": stanza,
-		"opzioni": {"strada": strada, "meteo": av and meteo, "libero": av and libero and not strada}})
+	var conf := {"regole": regole, "pista": Dati.PISTE[pista_n], "giri": giri, "auto": lista, "livello": livello, "stanza": stanza,
+		"opzioni": {"strada": strada, "meteo": av and meteo, "libero": av and libero and not strada, "qualifiche": qualifiche and not strada}}
+	if campionato:
+		conf.pista = camp_piste[0]
+		conf["campionato"] = {"piste": camp_piste.duplicate()}
+	via.emit(conf)
 
 ## Per i telefoni in sala d'attesa.
 func vista_attesa() -> Dictionary:

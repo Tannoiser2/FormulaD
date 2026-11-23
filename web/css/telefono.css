@@ -112,3 +112,5 @@ body.gara #app { max-width: none; height: 100%; display: block; }
   .gioco.prep .assetto { grid-template-columns: repeat(2, minmax(96px, 1fr) 44px 34px 44px); column-gap: 10px; }
 }
 .azione button.piccolo { min-height: 34px; font-size: 15px; background: #2b3242; margin-top: 6px; padding: 4px 10px; width: auto; }
+.gomme.qmarce { display: grid; grid-template-columns: 1fr 1fr; }
+.azione .gomme.qmarce button { font-size: 15px; min-height: 46px; line-height: 1.15; }

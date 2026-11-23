@@ -181,6 +181,10 @@ const REGOLE_IN_BREVE := """[b]Scopo[/b] - Tagliare per primi il traguardo dopo 
 - Gomme da pioggia: con la pioggia +1 casella quando la mossa tocca una curva; all'asciutto andare lungo costa il doppio (il triplo dopo due giri).
 - Al box si possono cambiare le gomme.
 
+[b]Qualifiche a settori[/b] (facoltative; sempre nel campionato) - Il giro ha 3 settori, ognuno con un limite (32 meno 3 per ogni fermata delle sue curve, fra 12 e 26). In ogni settore si sceglie una marcia dalla 3a alla 6a e si tira: entro il limite si fanno i punti del dado, oltre di 1-4 il limite meno 2 per ogni casella in più, oltre di 5 o più testacoda (0). Vince il giro con più punti; a parità chi ha fatto di più nel 3° settore, poi il dado nero. Con 8 auto o più: Q1 (escono gli ultimi), Q2 (fino a 7), Q3 (4 auto, si gira dall'ultimo al primo). Un settore si può riprovare: con le regole base una volta per sessione, con le avanzate ogni nuovo tiro costa 1 Gomme per la gara (al massimo 2); con le avanzate anche un testacoda costa 1 Gomme.
+
+[b]Campionato[/b] (regolamento di Gianluca Lari) - Più Gran Premi di fila con le qualifiche. Punti 8-6-4-2-1 ai primi cinque arrivati; classifica scuderie (i due piloti dello stesso colore); premio Gilles Villeneuve per chi guadagna più posizioni dalla griglia all'arrivo (chi non arriva conta ultimo). Ogni pilota ha 1 Punto Pilota per gara, che permette di ritirare il dado della marcia; i primi tre di ogni GP ne guadagnano uno in più per le gare seguenti (al massimo 4, si spendono prima quelli guadagnati).
+
 [b]Gara su strada[/b] - Niente box. Una volta per giro, dopo il tiro, si può usare il Nitro: si avanza di tante caselle in più quante il numero della marcia, e vanno fatte tutte. Al traguardo (punto di controllo), con le regole base si recuperano 10 PS fino a 18; con le avanzate si recuperano tutte le Gomme e 2 punti nelle zone più rovinate.
 Con le regole avanzate ogni pilota guida la sua auto, solo con gomme dure, e ha un'abilità:
 - Li Tsu Sin: chi taglia il traguardo mentre lei è in gara avanza di una casella in meno.

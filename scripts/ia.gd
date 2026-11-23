@@ -28,6 +28,21 @@ static func decidi(m: Motore, livello := 1) -> Dictionary:
 	_scala_danni = _q("danno", 1.0) * (f0 + (1.0 - f0) * resta(m, a))
 	if att.tipo == "assetto":
 		return m.assetto_ia(a, att.get("box", false))
+	if att.tipo == "qualifica" or att.tipo == "qritira":
+		return _qualifica(m, att, livello, rumore)
+	if att.tipo == "mossa" and int(a.get("pp", 0)) > 0:
+		# Punto Pilota: si ritira il dado se tutte le caselle portano al ritiro o costano parecchio
+		var meglio := INF
+		for cid in m.opzioni:
+			var e: Dictionary = m.opzioni[cid].eff
+			var c := 0.0
+			for k in e.usura:
+				c += e.usura[k]
+			if e.fuori != "":
+				c += 100.0
+			meglio = min(meglio, c)
+		if meglio >= 3.0:
+			return {"t": "ritira"}
 	if att.tipo == "mossa":
 		return {"t": "mossa", "c": _migliore(m, a, m.opzioni, a.marcia, a.pf, rumore)[0]}
 	var best_m := 1
@@ -205,3 +220,38 @@ static func _frenata(m: Motore, n: int, av: Dictionary, pf: Dictionary) -> float
 	if n >= pf.ps:
 		return -60.0
 	return av.uscita + 2.0 - n * _peso(m, "ps", pf.ps - n)
+
+
+## Qualifiche: il prudente prende la marcia con più punti in media; gli altri rischiano di più quando devono
+## rimontare (ultima sessione o vicino alla zona di eliminazione).
+static func _qualifica(m: Motore, att: Dictionary, livello: int, rumore: float) -> Dictionary:
+	var q: Dictionary = m.s.q
+	var ultima: bool = int(q.sess) == q.dim.size() - 1
+	var resta := 3 - int(att.sett)
+	# quanto manca per stare davanti: nell'ultima sessione la pole, altrimenti il posto che passa il turno
+	var bersaglio := 0.0
+	var tempi := []
+	for k in q.pos:
+		tempi.append(int(q.giri[str(q.coda[k])].tot))
+	tempi.sort()
+	tempi.reverse()
+	var passa: int = int(q.dim[q.sess + 1]) if q.sess + 1 < q.dim.size() else 1
+	if tempi.size() >= passa:
+		bersaglio = float(tempi[passa - 1])
+	var serve: float = (bersaglio - float(att.fatto)) / max(1, resta)
+	var rischio := 0.0
+	if livello >= 1 and bersaglio > 0.0:
+		rischio = clamp((serve - 14.0) / 10.0, 0.0, 1.0) * (1.0 if ultima or livello >= 2 else 0.5)
+	if att.tipo == "qritira":
+		var best := 0.0
+		for o in att.marce:
+			best = max(best, float(o.media))
+		return {"t": "qritira", "si": float(att.punti) < best * (0.5 + 0.2 * rischio)}
+	var scelta := 4
+	var voto_max := -INF
+	for o in att.marce:
+		var voto: float = float(o.media) + rischio * float(o.sd) + rng.randf_range(-rumore, rumore)
+		if voto > voto_max:
+			voto_max = voto
+			scelta = int(o.m)
+	return {"t": "qualifica", "m": scelta}
