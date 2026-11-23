@@ -479,7 +479,7 @@ func _mostra(ev: Array) -> void:
 				rete.suono("dado")
 				await hud.mostra_dado(int(e.marcia), int(e.valore), int(e.faccia), nome, 0.6 / mondo.velocita)
 			"nero":
-				hud.mostra_nero(int(e.valore), str(e.motivo), bool(e.male))
+				hud.mostra_nero(int(e.valore), str(e.motivo), bool(e.male), str(e.get("testo", "")), _nome_auto(int(e.auto)) if int(e.auto) >= 0 else "")
 				rete.suono("botto" if e.male else "nero")
 				await get_tree().create_timer(0.55 / mondo.velocita).timeout
 			"muovi":

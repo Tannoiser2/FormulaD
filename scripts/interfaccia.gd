@@ -20,7 +20,10 @@ var plancia_info: Label
 var plancia: Plancia
 var plancia_nome: Label
 var p_dado: PanelContainer
-var dado_box: HBoxContainer
+var dadi_area: Control          # la striscia dove il dado entra da destra e rotola fino a sinistra
+var dadi_neri: HBoxContainer    # i dadi neri, piccoli, accanto al dado della marcia
+var dadi_testo: Label           # sotto i dadi: che cosa è uscito
+var _dado3: Dado3D
 var p_sx: PanelContainer
 var col_dx: VBoxContainer
 var b_mappa: Button
@@ -137,10 +140,20 @@ func _ready() -> void:
 	p_dado = UI.pannello(UI.FONDO, UI.FONDO2)
 	col_dx.add_child(p_dado)
 	p_dado.custom_minimum_size.y = 136
-	dado_box = UI.riga(12)
-	dado_box.custom_minimum_size.y = 110
-	dado_box.alignment = BoxContainer.ALIGNMENT_BEGIN
-	p_dado.add_child(dado_box)
+	var vdad := UI.colonna(2)
+	p_dado.add_child(vdad)
+	dadi_area = Control.new()
+	dadi_area.clip_contents = true
+	dadi_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dadi_area.custom_minimum_size = Vector2(LARG_DX - 40, 72)
+	vdad.add_child(dadi_area)
+	dadi_neri = UI.riga(8)
+	dadi_neri.position = Vector2(0, 12)
+	dadi_area.add_child(dadi_neri)
+	dadi_testo = UI.testo("", 18, UI.CHIARO, false, LARG_DX - 40)
+	dadi_testo.max_lines_visible = 2
+	dadi_testo.custom_minimum_size = Vector2(LARG_DX - 40, 44)
+	vdad.add_child(dadi_testo)
 	# le scelte sotto i dadi
 	p_azione = UI.pannello()
 	p_azione.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -403,39 +416,55 @@ func _taglia_cronaca() -> void:
 
 # ------------------------------------------------------------------ dadi
 
-func _faccia(testo: String, col: Color, chiaro: bool, sotto: String) -> Control:
-	var vb := UI.colonna(2)
-	var p := UI.pannello(col, Color.WHITE if not chiaro else Color.BLACK, 12, 3, 4)
-	p.custom_minimum_size = Vector2(72, 72)
-	var l := UI.testo(testo, 46, Color.BLACK if chiaro else Color.WHITE, true)
+## Il dado della marcia entra nel riquadro da destra e rotola fino a sinistra, fermandosi sul numero uscito.
+func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 0.6) -> void:
+	# i dadi neri dello stesso turno (la partenza) restano, spostati a destra del dado della marcia
+	if is_instance_valid(_dado3):
+		_dado3.queue_free()
+	dadi_neri.position.x = 86.0
+	_dado3 = Dado3D.new(72)
+	dadi_area.add_child(_dado3)
+	var largo: float = max(dadi_area.size.x, LARG_DX - 40)
+	dadi_testo.text = "%s in %s: %d" % [Dati.corto(nome), Dati.NOMI_MARCE[marcia], valore]
+	dadi_testo.add_theme_color_override("font_color", UI.CHIARO)
+	if durata <= 0.0:
+		_dado3.position = Vector2.ZERO
+		await _dado3.mostra(marcia, faccia, 0.0)
+		return
+	var t := durata * 1.6
+	_dado3.position = Vector2(largo, 0)
+	var tw := create_tween()
+	tw.tween_property(_dado3, "position", Vector2.ZERO, t).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	await _dado3.mostra(marcia, faccia, t, true)
+	if tw.is_valid() and tw.is_running():
+		await tw.finished
+
+## Un dado nero: un quadratino accanto al dado della marcia; sotto, che cosa ha deciso.
+func mostra_nero(valore: int, motivo: String, male: bool, testo := "", nome := "") -> void:
+	dadi_neri.position.x = 86.0 if is_instance_valid(_dado3) and _dado3 != null else 0.0
+	while dadi_neri.get_child_count() >= 6:
+		var vecchio := dadi_neri.get_child(0)
+		dadi_neri.remove_child(vecchio)
+		vecchio.queue_free()
+	var p := UI.pannello(Color(0.05, 0.05, 0.06), UI.ROSSO if male else Color(0.8, 0.8, 0.85), 8, 3 if male else 2, 2)
+	p.custom_minimum_size = Vector2(46, 46)
+	var l := UI.testo(str(valore), 28, Color.WHITE, true)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	p.add_child(l)
-	vb.add_child(p)
-	var s := UI.testo(sotto, 18, UI.GRIGIO)
-	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(s)
-	return vb
-
-func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 0.6) -> void:
-	for c in dado_box.get_children():
-		c.queue_free()
-	var d3 := Dado3D.new(90)
-	dado_box.add_child(d3)
-	await d3.mostra(marcia, faccia, durata)
-	dado_box.add_child(_faccia(str(valore), Dati.COLORI_MARCE[marcia], marcia == 1, "%s in %s" % [Dati.corto(nome), Dati.NOMI_MARCE[marcia]]))
-
-func mostra_nero(valore: int, motivo: String, male: bool) -> void:
-	if dado_box.get_child_count() > 4:
-		dado_box.get_child(2).queue_free()
-	var c := _faccia(str(valore), Color(0.05, 0.05, 0.06), false, motivo.left(22))
-	if male:
-		(c.get_child(0) as PanelContainer).add_theme_stylebox_override("panel", UI.riquadro(Color(0.05, 0.05, 0.06), UI.ROSSO, 12, 4, 4))
-	dado_box.add_child(c)
+	dadi_neri.add_child(p)
+	var chi := (Dati.corto(nome) + ", ") if nome != "" else ""
+	dadi_testo.text = "Dado nero %d - %s%s: %s" % [valore, chi, motivo, testo] if testo != "" else "Dado nero %d - %s%s" % [valore, chi, motivo]
+	dadi_testo.add_theme_color_override("font_color", Color(1, 0.55, 0.5) if male else UI.CHIARO)
 
 func pulisci_dadi() -> void:
-	for c in dado_box.get_children():
+	if is_instance_valid(_dado3):
+		_dado3.queue_free()
+	_dado3 = null
+	for c in dadi_neri.get_children():
+		dadi_neri.remove_child(c)
 		c.queue_free()
+	dadi_testo.text = ""
 
 # ------------------------------------------------------------------ decisioni
 

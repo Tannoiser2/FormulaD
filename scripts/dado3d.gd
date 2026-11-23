@@ -46,7 +46,8 @@ static func rotazione(marcia: int, faccia: int) -> Quaternion:
 	var b := Basis.from_euler(Vector3(deg_to_rad(f[1]), -deg_to_rad(f[2]), -deg_to_rad(f[3])), EULER_ORDER_YXZ)
 	return b.get_rotation_quaternion()
 
-func mostra(marcia: int, faccia: int, durata := 0.6) -> void:
+## rotola: il dado entra da destra (lo sposta chi lo contiene) e gira come una ruota verso sinistra.
+func mostra(marcia: int, faccia: int, durata := 0.6, rotola := false) -> void:
 	var nome: String = Dati.MODELLI_DADI[marcia]
 	dado.mesh = load("res://assets/modelli/%s.obj" % nome)
 	var m := StandardMaterial3D.new()
@@ -63,6 +64,19 @@ func mostra(marcia: int, faccia: int, durata := 0.6) -> void:
 		tw.kill()
 	if durata <= 0.0:
 		dado.quaternion = q
+		return
+	if rotola:
+		# qualche giro attorno all'asse verso la camera (rotola verso sinistra) e si posa sulla faccia uscita
+		var giri := 2 + randi() % 2
+		tw = create_tween()
+		tw.tween_method(func(t: float):
+			var resto := 1.0 - t
+			var spin := Quaternion(Vector3(0, 0, 1), resto * TAU * giri)
+			dado.quaternion = spin * q
+			dado.position = Vector3(0, abs(sin(t * PI * 3.0)) * 0.35 * resto, 0), 0.0, 1.0, durata).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+		await tw.finished
+		dado.quaternion = q
+		dado.position = Vector3.ZERO
 		return
 	dado.quaternion = Quaternion(Vector3(randf() - 0.5, randf() - 0.5, randf() - 0.5).normalized(), randf() * TAU)
 	dado.position = Vector3(0, 1.2, 0)

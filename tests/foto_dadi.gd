@@ -1,27 +1,21 @@
 extends SceneTree
-## Controllo dei dadi 3D: ogni dado con alcune facce, accanto al valore atteso; più un'auto vista da vicino.
-func _init() -> void:
-	var dir := OS.get_cmdline_user_args()[0]
+## Il box dei dadi durante una gara vera: una foto ogni 0.12 s ritagliata sul box.
+func _init():
+	var a := OS.get_cmdline_user_args()
+	var dir: String = a[0]
+	if a.size() >= 3: root.size = Vector2i(int(a[1]), int(a[2]))
 	DirAccess.make_dir_recursive_absolute(dir)
-	UI.prepara()
-	var bg := ColorRect.new()
-	bg.color = Color(0.2, 0.2, 0.25)
-	bg.size = Vector2(1920, 1080)
-	root.add_child(bg)
-	var g := GridContainer.new()
-	g.columns = 9
-	root.add_child(g)
-	for marcia in range(1, 7):
-		var n: int = Dati.DADI[marcia].size()
-		for k in 9:
-			var f: int = int(k * n / 9.0)
-			var vb := VBoxContainer.new()
-			var d := Dado3D.new(150)
-			vb.add_child(d)
-			d.mostra(marcia, f, 0.0)
-			vb.add_child(UI.testo("m%d atteso %d" % [marcia, Dati.DADI[marcia][f][0]], 22))
-			g.add_child(vb)
+	await process_frame
+	var main = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	await create_timer(0.8).timeout
+	main.menu._voce("locale")
+	main.menu._via()
 	await create_timer(1.0).timeout
-	root.get_viewport().get_texture().get_image().save_png(dir + "/dadi.png")
-	print("foto dadi")
+	for k in 40:
+		await create_timer(0.12).timeout
+		var im: Image = root.get_viewport().get_texture().get_image()
+		var r: Rect2 = main.hud.p_dado.get_global_rect()
+		var sc: float = im.get_width() / main.hud.get_viewport_rect().size.x
+		im.get_region(Rect2i(r.position * sc, r.size * sc)).save_png("%s/b_%02d.png" % [dir, k])
 	quit()
