@@ -89,8 +89,13 @@ la gara su strada si corre sui circuiti presenti.
 
 Il riepilogo completo è nel gioco (pulsante **Regole**) e in `scripts/dati.gd`.
 
-Le auto che tagliano il traguardo o si ritirano lasciano la pista. Se più auto arrivano nello stesso turno, l'ordine
-d'arrivo è quello di gioco (prima chi era davanti).
+Le auto che tagliano il traguardo o si ritirano lasciano la pista. Se più auto arrivano nello stesso turno, arriva
+prima chi va più caselle oltre la linea (a parità chi l'ha tagliata per prima).
+
+**Regolamento Lari** (Regole: Lari, e nel campionato): cordoli, motore fuori giri, tabelle dei danni con carrozzeria,
+motore e tenuta a zero, strada bloccata e tamponamento, punti meccanici e sosta 2-4 caselle ai box, rischio pilota e
+collaudatore, meteo variabile che si blocca, Punti Pilota anche sul dado nero, premi di esperienza fra un campionato e
+l'altro. **KERS** fra gli extra.
 
 ## Per chi lo sviluppa
 

@@ -88,6 +88,8 @@ func _ready() -> void:
 		menu.meteo = par.has("meteo")
 		menu.libero = par.has("libero")
 		menu.qualifiche = par.has("qualifiche")
+		menu.lari = par.has("lari")
+		menu.kers = par.has("kers")
 		menu._voce("stanza_online" if par.has("online") else "stanza_tv")
 		if par.has("online"):
 			menu.posti[0].tipo = "ia"   # nelle prove nessuno guida da questo computer
@@ -102,7 +104,8 @@ func _ready() -> void:
 			lista.append({"nome": Dati.PILOTI[i].nome, "pilota": i, "tipo": "ia", "uid": ""})
 		_via({"regole": str(par.get("regole", "avanzate")), "pista": str(par.get("pista", "FDMonaco")), "giri": int(par.get("giri", 1)),
 			"auto": lista, "livello": 1, "stanza": false,
-			"opzioni": {"strada": par.has("strada"), "meteo": par.has("meteo"), "libero": par.has("libero"), "qualifiche": par.has("qualifiche")}})
+			"opzioni": {"strada": par.has("strada"), "meteo": par.has("meteo"), "libero": par.has("libero"), "qualifiche": par.has("qualifiche"),
+				"lari": par.has("lari"), "kers": par.has("kers")}})
 
 # ------------------------------------------------------------------ comandi
 
@@ -231,11 +234,13 @@ func _solo_velo() -> void:
 		c.visible = false
 	menu.visible = false
 	await hud.velo.tree_exited
+	for c in hud._pannelli:
+		c.visible = c != hud.p_dado and c != hud.p_qr and c != hud.p_ass
 	if modo == "menu":
 		hud.visible = false
 		menu.visible = true
-		for c in hud._pannelli:
-			c.visible = c != hud.p_dado
+	else:
+		_qr_in_gara()
 
 func _al_menu() -> void:
 	hud.nascondi_qr()
@@ -279,12 +284,22 @@ func _gp() -> void:
 	hud.cronaca("Campionato: Gran Premio %d di %d, %s" % [int(camp.gp) + 1, camp.piste.size(), Campionato.nome_pista(camp.piste[int(camp.gp)])], "giro")
 
 ## A gara finita: se è un GP del campionato si aggiornano le classifiche (una volta sola).
+func _esperienza() -> Dictionary:
+	var t: String = rete.carica("fd_esperienza")
+	var x = JSON.parse_string(t) if t != "" else null
+	return x if x is Dictionary else {}
+
 func _fine_gp() -> void:
 	if motore == null or not motore.s.has("camp") or camp.is_empty():
 		return
 	if int(motore.s.camp) != int(camp.gp):
 		return
 	var rie := Campionato.registra(camp, motore.s)
+	if camp.finito:
+		var x := Campionato.esperienza_finale(camp, _esperienza())
+		rete.salva("fd_esperienza", JSON.stringify(x[0]))
+		if str(x[1]) != "":
+			hud.cronaca("Premi di esperienza per il prossimo campionato: " + str(x[1]), "arrivo")
 	_salva_campionato()
 	hud.riepilogo_gp = rie
 
@@ -292,7 +307,7 @@ func _fine_gp() -> void:
 
 func _via(conf: Dictionary) -> void:
 	if conf.has("campionato"):
-		camp = Campionato.nuovo(conf)
+		camp = Campionato.nuovo(conf, _esperienza())
 		_salva_campionato()
 		_gp()
 		return

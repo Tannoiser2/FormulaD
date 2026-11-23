@@ -66,11 +66,17 @@ function usura(regole, u) {
 }
 const NOMI_CORTI = { ps: 'PS', gomme: 'Gomme', freni: 'Freni', cambio: 'Cambio', carrozzeria: 'Carrozz.', motore: 'Motore', tenuta: 'Tenuta' };
 const CHIARI = { ps: '#f8e48c', gomme: '#9a94db', freni: '#b8d98c', cambio: '#8ccaca', carrozzeria: '#f2c98c', motore: '#ec958c', tenuta: '#c994d9' };
-function opzExtra(o) { return (o.pi || 0) > 0 || (o.sc || 0) > 0 || (o.jk || 0) !== 0; }
+// il nome breve: il nome proprio, ma «Pilota 3» resta intero
+function corto(n) { const p = String(n).trim().split(/\s+/); return p.length > 1 && (/^\d+$/.test(p[1]) || p[0].length <= 2) ? p[0] + ' ' + p[1] : p[0]; }
+function opzExtra(o) { return (o.pi || 0) > 0 || (o.sc || 0) > 0 || (o.jk || 0) !== 0 || (o.co || 0) !== 0; }
 // le scritte su una casella: le caselle in più e che cosa costa
 function righeOpz(o) {
   const r = [];
-  const ni = o.ni || 0, pi = (o.pi || 0) - ni;
+  const ni = o.ni || 0, fg = o.fg || 0, pk = o.pk || 0, pi = (o.pi || 0) - ni - fg - (pk ? (o.pi || 0) : 0);
+  if (fg > 0) r.push([`FUORI GIRI +${fg}`, '#40e6ff']);
+  if (pk > 0) r.push([`KERS +${o.pi}`, '#40e6ff']);
+  if (o.co) r.push([`CORDOLO ${o.co > 0 ? '+1' : '-2'}`, '#40e6ff']);
+  if (o.tp) r.push(['TAMPONA', '#ff5a4d']);
   if (ni > 0) r.push([`NITRO +${ni}`, '#40e6ff']);
   if (pi > 0) r.push([`MORBIDE +${pi}`, '#40e6ff']);
   if (o.sc > 0) r.push([o.sc === 1 ? 'SCIA' : `SCIA x${o.sc}`, '#40e6ff']);
@@ -97,6 +103,10 @@ function testoOpz(regole, o) {
   if (o.ol > 0) parti.push(`lungo di ${o.ol}`);
   if (o.ni > 0) parti.push(`con il Nitro (+${o.ni})`);
   if (o.jk) parti.push('derapata');
+  if (o.fg > 0) parti.push(`con il motore fuori giri (+${o.fg}, 1 Motore)`);
+  if (o.pk > 0) parti.push(`con il KERS (+${o.pi})`);
+  if (o.co) parti.push(`sul cordolo ${o.co > 0 ? 'interno (+1)' : 'esterno (-2)'}`);
+  if (o.tp) parti.push("TAMPONA l'auto davanti");
   let t = parti.join(', ') + '.';
   if (o.fi) return t + ' TRAGUARDO!';
   const c = usura(regole, o.u);
@@ -247,6 +257,10 @@ function disegna() {
     if (stato.mt >= 0) st += ` - ${METEO[stato.mt]}`;
     if (stato.mon) st += ` - gomme ${(GOMME[mia.gt] || 'dure').toLowerCase()}`;
     if (stato.str) st += ` - Nitro ${mia.ni ? 'pronto' : 'usato'}`;
+    if (stato.kers) st += ` - KERS ${mia.pk || 0}`;
+    if (stato.lari) st += ` - meccanici ${mia.pm || 0}`;
+    const DZ = { musetto: 'senza musetto (max 3a)', potenza: 'motore senza potenza', affidabile: 'motore da controllare', sospensioni: 'sospensioni rotte' };
+    for (const z of Object.values(mia.dz || {})) if (DZ[z]) st += ` - ${DZ[z]}`;
     if (mia.pa > 0) st = `ARRIVATO: ${mia.pa}° posto`;
     else if (mia.f) st = `RITIRATO: ${esc(mia.w)}`;
     testa = `<div class="chi"><span class="nome" style="color:${colore(mia.p)}">${esc(mia.n)}</span><span class="dati">${st}</span></div>
@@ -324,7 +338,7 @@ function ordine(io) {
     const a = stato.auto[i];
     const fuori = a.pa > 0 || a.f;
     return `<span class="oc ${att && att.auto === i ? 'turno' : ''} ${i === io ? 'io' : ''} ${fuori ? 'via' : ''}"><i style="background:${colore(a.p)}"></i>
-      <span class="n">${esc(String(a.n).split(' ')[0])}</span><b style="background:${COL_MARCE[a.m]};color:${a.m === 1 ? '#111' : '#fff'}">${a.pa > 0 ? a.pa + '°' : a.f ? 'rit' : a.m > 0 ? MARCE[a.m] : '-'}</b></span>`;
+      <span class="n">${esc(corto(a.n))}</span><b style="background:${COL_MARCE[a.m]};color:${a.m === 1 ? '#111' : '#fff'}">${a.pa > 0 ? a.pa + '°' : a.f ? 'rit' : a.m > 0 ? MARCE[a.m] : '-'}</b></span>`;
   }).join('');
 }
 

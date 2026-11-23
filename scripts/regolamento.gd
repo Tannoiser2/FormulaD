@@ -6,6 +6,7 @@ extends RefCounted
 const CAPITOLI := [
 ["Il gioco", """[b]Scopo[/b]
 Vince chi taglia per primo il traguardo dopo i giri stabiliti (1, 2 o 3). La gara continua finché tutte le auto sono arrivate o ritirate: così si stabiliscono anche gli altri posti.
+Se più auto tagliano il traguardo nello stesso turno, arriva prima quella che va più caselle oltre la linea; a parità, chi l'ha tagliata per primo.
 
 [b]Il materiale[/b]
 - Il tabellone: il circuito diviso in caselle, su tre corsie (destra, centro, sinistra rispetto al verso di marcia) più la corsia dei box.
@@ -213,8 +214,56 @@ I primi cinque arrivati prendono [b]8, 6, 4, 2 e 1[/b] punti. Le auto ritirate n
 - Si spendono prima i punti provvisori; quelli spesi non tornano. Il punto permanente torna a ogni GP.
 Nel gioco il pulsante «Punto Pilota» compare dopo il tiro quando ne hai ancora.
 
-[b]Non ancora nel gioco[/b]
-Del regolamento mancano: preparazione dell'auto con 10+10 punti assetto per ogni GP, Punti Pilota su qualsiasi dado, cordoli, strada bloccata e tamponamento, tabelle dei danni (telaio, motore, sospensioni), fuori giri, KERS, punti meccanici ai box, rischio pilota, arrivo deciso da chi va più oltre il traguardo, premi di esperienza fra un campionato e l'altro."""],
+[b]Regolamento Lari[/b]
+Nel campionato si usa di solito anche il resto del regolamento di Gianluca Lari (le regole «Lari» nella preparazione): vedi il capitolo Regolamento Lari. Con il regolamento Lari:
+- a ogni GP, dopo le qualifiche, ognuno prepara l'assetto della sua auto (20 punti fra le zone, come l'assetto libero);
+- ogni auto ha 2 punti meccanici per gara per le riparazioni ai box;
+- i Punti Pilota servono anche per ritirare il dado nero (vedi il capitolo).
+
+[b]Rischio pilota e collaudatore[/b]
+Un pilota che si fa male (rischio pilota) salta la gara seguente; un pilota che non ce la fa lascia il campionato. Al suo posto guida il [b]collaudatore[/b] della scuderia: i suoi punti vanno solo alla classifica scuderie, non a quella piloti.
+
+[b]Premi di esperienza[/b]
+A campionato finito i primi tre della classifica piloti guadagnano 1 Punto Pilota permanente per i campionati seguenti (al massimo 3 permanenti), la scuderia campione 1 punto meccanico in più (al massimo 2 in più). Valgono per i piloti con lo stesso nome e restano salvati su questo dispositivo.
+
+[b]Non nel gioco[/b]
+Il giro di qualifica cronometrato (ci sono le qualifiche a settori) e il sorteggio delle scuderie fra un campionato e l'altro: qui ogni giocatore sceglie la sua auto."""],
+
+["Regolamento Lari", """Si sceglie nella preparazione con [b]Regole: Lari[/b]: sono le regole avanzate con le aggiunte del regolamento del campionato di Gianluca Lari (versione 1.2). Nel campionato sono la scelta normale, ma si possono usare anche in una gara singola.
+
+[b]Punti Pilota[/b]
+Ogni pilota ha 1 Punto Pilota per gara (nel campionato di più, vedi Campionato). Oltre a ritirare il dado della marcia (pulsante «Punto Pilota»), il gioco lo spende da solo per ritirare il [b]dado nero[/b] quando il risultato sarebbe grave: un danno in una zona già a zero, un ritiro, il rischio pilota.
+
+[b]Cordoli[/b]
+In curva, senza frenare:
+- [b]cordolo interno[/b]: se la mossa passa su almeno una casella della corsia interna della curva, si può avanzare di 1 casella in più;
+- [b]cordolo esterno[/b]: se la mossa finisce sulla terza di almeno tre caselle di fila nella corsia esterna, quella casella vale 3: si avanza di 2 caselle in meno.
+Dopo il cordolo si controllano le sospensioni: dado nero da 1 a 4 (da 1 a 5 con la pioggia), 1 Tenuta di strada. Sul tabellone le caselle si vedono con la scritta CORDOLO.
+
+[b]Motore fuori giri[/b]
+Partendo da un rettilineo, dopo il tiro si può mandare il motore fuori giri: 1 Motore per tante caselle in più quanto il numero della marcia (1 in 1a, 6 in 6a). Vanno fatte tutte, senza frenare e senza scia dopo; non lascia detriti. Una volta per turno, solo se si ha almeno 1 Motore.
+
+[b]KERS[/b] (Extra, si può usare anche senza il regolamento Lari)
+In 4a o più, i due numeri più alti del dado (11-12 in 4a, 19-20 in 5a, 29-30 in 6a) caricano 1 punto KERS, fino a 3. Si usa dopo il tiro: con 1 punto +1 casella, con 2 +2, con 3 +4; si spendono sempre tutti. Con il KERS il Motore arriva al massimo a 2.
+
+[b]Strada bloccata e tamponamento[/b]
+Se le auto davanti chiudono la strada e bisogna frenare più di 6 caselle: le prime 6 si pagano come una frenata (3 Freni e 3 Gomme), le altre con punti di altre zone (il gioco toglie da quelle che ne hanno di più, senza portare a zero carrozzeria, motore e tenuta). Se non bastano, l'auto tampona quella davanti: perde tutta la Carrozzeria e tira la tabella dei danni al telaio; l'auto tamponata perde 1 Carrozzeria.
+
+[b]Carrozzeria, motore e tenuta a zero[/b]
+A zero l'auto non è eliminata. Se deve perdere un punto che non ha più tira il dado nero sulla tabella della zona:
+- [b]Telaio (carrozzeria)[/b]: 1-2 incidente grave, ritiro e rischio pilota; 3-18 perde il musetto, al massimo in 3a; 19-20 testacoda e 2 punti persi a scelta.
+- [b]Motore[/b]: 1-2 motore rotto, ritiro; 3-18 perde potenza, ogni dado dà sempre il numero più basso; 19-20 nessuna conseguenza, ma alla fine di ogni suo turno la prova di affidabilità: dado nero uguale o sotto la marcia e il motore cede.
+- [b]Sospensioni (tenuta)[/b]: 1-2 danno irrimediabile, ritiro; 3-18 sospensioni rotte, +3 caselle obbligatorie quando la mossa tocca una curva e andare lungo costa il doppio; 19-20 testacoda e 2 punti persi a scelta.
+Dopo la tabella, un altro punto perso nella stessa zona è un incidente grave: ritiro e rischio pilota. Senza Carrozzeria o Tenuta non si ha più il +1 delle gomme morbide.
+
+[b]Rischio pilota[/b]
+Dopo un incidente grave il dado nero: 1 il pilota non ce la fa (nel campionato lo sostituisce il collaudatore fino alla fine); 20 frattura, salta la gara seguente; 2-19 esce illeso.
+
+[b]Box[/b]
+Ogni auto ha [b]2 punti meccanici[/b] per gara (di più per la scuderia campione dell'anno prima). Alla sosta: gomme nuove e, con i punti meccanici, 1 punto per ognuno in Freni, Cambio, Carrozzeria, Motore o Tenuta (il gioco ripara prima le zone con danni gravi, che così tornano a posto). Poi il dado nero: 1-4 riparte subito in 4a per 2 caselle, 5-8 per 3, 9-12 per 4; 13-20 problemi ai box, riparte al turno dopo.
+
+[b]Meteo variabile[/b]
+Quando si ritira il dado del meteo, il risultato dice il tempo (pioggia o sereno; variabile lascia com'è). Se esce due volte di fila pioggia o due volte di fila sereno, il tempo non cambia più fino alla fine."""],
 
 ["Gara su strada", """[b]Il circuito[/b]
 Si corre sugli stessi tabelloni ma con le regole delle gare cittadine:

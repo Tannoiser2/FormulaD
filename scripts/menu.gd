@@ -26,6 +26,8 @@ var libero := false
 var qualifiche := false
 var abilita := false     # in circuito: i personaggi con le loro abilità (su strada ci sono sempre, con le regole avanzate)
 var nitro := false       # in circuito: il Nitro come su strada
+var lari := false        # regolamento del campionato di Gianluca Lari (sopra le regole avanzate)
+var kers := false
 var nomi: Array = []     # i nomi scelti per i piloti (vuoto: «Pilota N»)
 var campionato := false
 var camp_piste: Array = []      # i circuiti scelti per il campionato, nell'ordine in cui si corrono
@@ -163,6 +165,8 @@ func _voce(cosa: String) -> void:
 			if camp_piste.is_empty():
 				camp_piste = ["FDMonaco", "FDe04", "FDe19", "FDAustin", "FDe01"]
 			giri = 3
+			regole = "avanzate"
+			lari = true
 			_posti_iniziali()
 			preparazione()
 		"camp_continua":
@@ -298,8 +302,9 @@ func preparazione() -> void:
 	vs.add_child(_scelta("Giri", [["1", 1], ["2", 2], ["3", 3]], giri, func(x):
 		giri = x
 		preparazione()))
-	vs.add_child(_scelta("Regole", [["Base", "base"], ["Avanzate", "avanzate"]], regole, func(x):
-		regole = x
+	vs.add_child(_scelta("Regole", [["Base", "base"], ["Avanzate", "avanzate"], ["Lari", "lari"]], "lari" if lari and regole == "avanzate" else regole, func(x):
+		lari = x == "lari"
+		regole = "avanzate" if lari else x
 		preparazione()))
 	if not campionato:
 		vs.add_child(_scelta("Gara", [["In circuito", false], ["Su strada", true]], strada, func(x):
@@ -324,13 +329,13 @@ func preparazione() -> void:
 		var le := UI.testo("Extra", 26, UI.GRIGIO)
 		le.custom_minimum_size.x = 130
 		he.add_child(le)
-		var bn := UI.bottone("Nitro: " + ("sì" if nitro else "no"), 24, UI.ROSSO if nitro else UI.FONDO2, 0, 46)
+		var bn := UI.bottone("Nitro: " + ("sì" if nitro else "no"), 22, UI.ROSSO if nitro else UI.FONDO2, 0, 46)
 		bn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bn.pressed.connect(func():
 			nitro = not nitro
 			preparazione())
 		he.add_child(bn)
-		var ba := UI.bottone("Personaggi e abilità: " + ("sì" if abilita and regole == "avanzate" else "no"), 24,
+		var ba := UI.bottone("Personaggi: " + ("sì" if abilita and regole == "avanzate" else "no"), 22,
 			UI.ROSSO if abilita and regole == "avanzate" else UI.FONDO2, 0, 46)
 		ba.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		ba.disabled = regole != "avanzate"
@@ -339,13 +344,23 @@ func preparazione() -> void:
 			abilita = not abilita
 			preparazione())
 		he.add_child(ba)
+		var bk := UI.bottone("KERS: " + ("sì" if kers and regole == "avanzate" else "no"), 22,
+			UI.ROSSO if kers and regole == "avanzate" else UI.FONDO2, 0, 46)
+		bk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bk.disabled = regole != "avanzate"
+		bk.pressed.connect(func():
+			kers = not kers
+			preparazione())
+		he.add_child(bk)
 		vs.add_child(he)
 	vs.add_child(_scelta("Computer", [["Prudente", 0], ["Normale", 1], ["Esperto", 2]], livello, func(x):
 		livello = x
 		preparazione()))
 	var nota0 := "Base: 18 Punti Struttura per tutto. Avanzate: gomme, freni, cambio, carrozzeria, motore, tenuta di strada, scie e detriti."
 	var nota := nota0
-	if campionato:
+	if lari and regole == "avanzate" and not campionato:
+		nota = "Regolamento Lari: avanzate più cordoli, fuori giri, tabelle dei danni, strada bloccata, meccanici ai box, rischio pilota, Punti Pilota sul dado nero (vedi le Regole)."
+	elif campionato:
 		nota = "Prima di ogni GP le qualifiche a settori. Punti 8-6-4-2-1, classifica scuderie e premio Villeneuve. Ogni pilota ha 1 Punto Pilota per ritirare il dado, +1 per i primi tre di ogni GP."
 	elif qualifiche and not strada:
 		nota = "Qualifiche a settori: 3 tiri a giro, Q1-Q2-Q3 con 8 auto o più. " + nota0
@@ -591,7 +606,7 @@ func _via() -> void:
 	var av := regole == "avanzate"
 	var conf := {"regole": regole, "pista": Dati.PISTE[pista_n], "giri": giri, "auto": lista, "livello": livello, "stanza": stanza,
 		"opzioni": {"strada": strada, "meteo": av and meteo, "libero": av and libero and not strada, "qualifiche": qualifiche and not strada,
-			"abilita": av and (strada or abilita), "nitro": strada or nitro}}
+			"abilita": av and (strada or abilita), "nitro": strada or nitro, "lari": av and lari and not strada, "kers": av and kers}}
 	if campionato:
 		conf.pista = camp_piste[0]
 		conf["campionato"] = {"piste": camp_piste.duplicate()}

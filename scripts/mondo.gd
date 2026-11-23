@@ -340,7 +340,17 @@ const NOMI_CORTI := {"ps": "PS", "gomme": "Gomme", "freni": "Freni", "cambio": "
 static func righe_opzione(o: Dictionary) -> Array:
 	var r := []
 	var ni := int(o.get("ni", 0))
-	var pi := int(o.get("pi", 0)) - ni
+	var fg := int(o.get("fg", 0))
+	var pk := int(o.get("pk", 0))
+	var pi := int(o.get("pi", 0)) - ni - fg - (int(o.get("pi", 0)) if pk > 0 else 0)
+	if fg > 0:
+		r.append(["FUORI GIRI +%d" % fg, COL_EXTRA])
+	if pk > 0:
+		r.append(["KERS +%d" % int(o.get("pi", 0)), COL_EXTRA])
+	if int(o.get("co", 0)) != 0:
+		r.append(["CORDOLO %s" % ("+1" if int(o.co) > 0 else "-2"), COL_EXTRA])
+	if o.get("tp", false):
+		r.append(["TAMPONA", Color(1, 0.35, 0.3)])
 	if ni > 0:
 		r.append(["NITRO +%d" % ni, COL_EXTRA])
 	if pi > 0:
@@ -365,7 +375,7 @@ static func righe_opzione(o: Dictionary) -> Array:
 	return r
 
 static func opzione_extra(o: Dictionary) -> bool:
-	return int(o.get("pi", 0)) > 0 or int(o.get("sc", 0)) > 0 or int(o.get("jk", 0)) != 0
+	return int(o.get("pi", 0)) > 0 or int(o.get("sc", 0)) > 0 or int(o.get("jk", 0)) != 0 or int(o.get("co", 0)) != 0
 
 ## lista: le opzioni come nella vista ({c, x, y, u, fu, te, bx, fi, ...}): ogni casella raggiungibile si colora
 ## per intero, con scritto sopra che cosa costa; un bordo azzurro segna le caselle in più facoltative.

@@ -9,6 +9,10 @@ extends RefCounted
 const SCALATA_AVANZATA := [{}, {"cambio": 1}, {"cambio": 1, "freni": 1}, {"cambio": 1, "freni": 1, "motore": 1}]
 const FRENATA_MASSIMA := 6
 const ALLA_PARI := 0.25
+## Regolamento del campionato (Gianluca Lari): le zone che a zero non eliminano, ma fanno tirare la tabella dei danni.
+const ZONE_TABELLA := ["carrozzeria", "motore", "tenuta"]
+## Sosta ai box con il regolamento Lari: dado nero fino a ... -> caselle della ripartenza (0 = sosta lunga).
+const BOX_LARI := [[4, 2], [8, 3], [12, 4], [20, 0]]
 
 var s: Dictionary = {}
 var pista: Pista
@@ -36,7 +40,8 @@ static func nuova(conf: Dictionary) -> Motore:
 		"ordine": [], "auto": [], "danni": [], "arrivi": [], "attesa": null, "sforzo": false, "n_danni": 0,
 		"strada": strada, "libero": av and not strada and bool(op.get("libero", false)),
 		"meteo_on": av and bool(op.get("meteo", false)), "meteo": -1,
-		"abil": av and bool(op.get("abilita", strada)), "nitro": strada or bool(op.get("nitro", false))}
+		"abil": av and bool(op.get("abilita", strada)), "nitro": strada or bool(op.get("nitro", false)),
+		"lari": av and bool(op.get("lari", false)), "kers": av and bool(op.get("kers", false)), "meteo_ult": -1}
 	# griglia: ognuno tira il dado nero, il più alto parte in pole
 	var tiri := []
 	for i in conf.auto.size():
@@ -61,7 +66,12 @@ static func nuova(conf: Dictionary) -> Motore:
 			"pronto": not da_preparare,"i": m.s.auto.size(), "nome": c.nome, "pilota": int(c.pilota), "posto": Dati.PILOTI[int(c.pilota)].posto,
 			"tipo": c.get("tipo", "ia"), "uid": c.get("uid", ""), "c": m.pista.griglia[k], "marcia": 0, "pf": pf, "giro": 0,
 			"ferm": -1, "fuori": false, "perche": "", "posto_arrivo": 0, "testa": false, "max_marcia": 0, "stallo": -1,
-			"mosso": -1, "partito": false, "dado": 0, "tiro_griglia": tiri[k][0] / 100, "pp": int(c.get("pp", 0)), "pq": 0}
+			"mosso": -1, "partito": false, "dado": 0, "tiro_griglia": tiri[k][0] / 100, "pq": 0,
+			"pp": int(c.get("pp", 1 if m.s.lari else 0)), "pmec": int(c.get("pmec", 2)), "pk": 0, "dz": {}, "lim_marcia": 0,
+			"coll": bool(c.get("coll", false))}
+		if m.s.kers and pf.has("motore"):
+			pf.motore = min(int(pf.motore), 2)
+			a.pf0 = pf.duplicate()
 		m.s.auto.append(a)
 		m.s.ordine.append(a.i)
 		testo.append("%d. %s (%d)" % [k + 1, a.nome, a.tiro_griglia])
@@ -185,7 +195,17 @@ func _esito_meteo(v: int) -> int:
 func _cambia_meteo() -> void:
 	var r := _dado_meteo("cambio del tempo")
 	var prima: int = s.meteo
-	if r == 2:
+	if lari():
+		# il risultato dice il tempo; due volte di fila lo stesso (pioggia o sereno) e non cambia più
+		var ult := int(s.get("meteo_ult", -1))
+		if r == 0:
+			s.meteo = 3 if ult == 0 else 2
+		elif r == 2:
+			s.meteo = 0 if ult == 2 else 1
+		s.meteo_ult = r
+		if s.meteo == 0 or s.meteo == 3:
+			_msg("Meteo: due volte di fila %s, il tempo non cambia più" % ("pioggia" if s.meteo == 3 else "sereno"), "info")
+	elif r == 2:
 		s.meteo = max(0, s.meteo - 1)
 	elif r == 0:
 		s.meteo = min(3, s.meteo + 1)
@@ -198,6 +218,10 @@ func _cambia_meteo() -> void:
 
 ## Quanto costa ogni casella oltre la curva, a seconda delle gomme.
 func _molt_lungo(a: Dictionary) -> int:
+	var k := 2 if str(a.get("dz", {}).get("tenuta", "")) == "sospensioni" else 1
+	return k * _molt_gomme(a)
+
+func _molt_gomme(a: Dictionary) -> int:
 	if not s.get("meteo_on", false):
 		return 1
 	var t: String = a.get("gomme_tipo", "dure")
@@ -245,8 +269,16 @@ func _usura(a: Dictionary, usura: Dictionary, motivo: String, controlla := true)
 					_lascia_segnalino(a)
 	if perso.is_empty():
 		return
+	var gravi := []
+	if lari():
+		for zid in ZONE_TABELLA:
+			if a.pf.has(zid) and int(a.pf[zid]) < 0:
+				a.pf[zid] = 0
+				gravi.append(zid)
 	eventi.append({"t": "usura", "auto": a.i, "usura": perso, "motivo": motivo, "pf": a.pf.duplicate()})
 	_msg("%s perde %s (%s)" % [a.nome, Dati.testo_usura(s.regole, perso), motivo], "usura", a.i)
+	for zid in gravi:
+		_danno_grave(a, zid)
 	if controlla:
 		_controlla_fuori(a)
 
@@ -270,9 +302,111 @@ func _controlla_fuori(a: Dictionary) -> void:
 	if a.fuori:
 		return
 	for z in Dati.zone(s.regole):
-		if z.has("fuori") and a.pf[z.id] <= z.fuori:
+		if _esce(a, z, int(a.pf[z.id])):
 			_elimina(a, "%s a zero" % z.nome)
 			return
+
+## Con quel valore rimasto nella zona l'auto è fuori? Con il regolamento Lari carrozzeria, motore e tenuta a zero
+## non eliminano: perdere un punto in più fa tirare la tabella dei danni.
+func _esce(a: Dictionary, z: Dictionary, resta: int) -> bool:
+	if not z.has("fuori"):
+		return false
+	if s.get("lari", false) and ZONE_TABELLA.has(z.id):
+		return resta < 0 and a.get("dz", {}).has(z.id)
+	return resta <= int(z.fuori)
+
+func lari() -> bool:
+	return s.get("lari", false)
+
+## Dado nero con i Punti Pilota (regolamento Lari): se il risultato è grave e il pilota ha ancora Punti Pilota,
+## ne spende uno e ritira.
+func _nero_pp(a: Dictionary, male: Callable, perche: String) -> int:
+	var v := _nero()
+	if lari() and int(a.get("pp", 0)) > 0 and male.call(v):
+		a.pp -= 1
+		var v2 := _nero()
+		_msg("%s usa un Punto Pilota per ritirare il dado nero (%s): %d invece di %d, ne restano %d" % [a.nome, perche, v2, v, a.pp], "avviso", a.i)
+		v = v2
+	return v
+
+## Regolamento Lari: una zona fra carrozzeria, motore e tenuta deve perdere un punto che non ha più.
+func _danno_grave(a: Dictionary, zid: String) -> void:
+	if not in_gara(a):
+		return
+	var dz: Dictionary = a.get("dz", {})
+	if dz.has(zid):
+		var t: String = {"carrozzeria": "un altro colpo al telaio: incidente grave", "motore": "il motore prende fuoco",
+			"tenuta": "le sospensioni cedono: incidente grave"}[zid]
+		_msg("%s: %s" % [a.nome, t], "fuori", a.i)
+		_ritiro_grave(a, t)
+		return
+	var v := _nero_pp(a, func(x): return x <= 2, "danni")
+	var nome := Dati.nome_zona(s.regole, zid)
+	if v <= 2:
+		var t: String = {"carrozzeria": "incidente grave, l'auto è distrutta", "motore": "rottura del motore",
+			"tenuta": "danno irrimediabile alle sospensioni"}[zid]
+		_nero_evento(a, v, "danni: %s a zero" % nome, t, true)
+		if zid == "carrozzeria":
+			_ritiro_grave(a, t)
+		else:
+			_elimina(a, t)
+		return
+	if v <= 18:
+		match zid:
+			"carrozzeria":
+				dz[zid] = "musetto"
+				a.lim_marcia = 3
+				_nero_evento(a, v, "danni: telaio a zero", "perde il musetto: al massimo in 3a", true)
+			"motore":
+				dz[zid] = "potenza"
+				_nero_evento(a, v, "danni: motore a zero", "perde potenza: ogni dado dà il numero più basso", true)
+			"tenuta":
+				dz[zid] = "sospensioni"
+				_nero_evento(a, v, "danni: sospensioni a zero", "sospensioni rotte: +3 caselle obbligatorie in curva, lungo costa il doppio", true)
+	else:
+		if zid == "motore":
+			dz[zid] = "affidabile"
+			_nero_evento(a, v, "danni: motore a zero", "nessuna conseguenza, ma a ogni turno la prova di affidabilità", false)
+		else:
+			dz[zid] = "testacoda"
+			_nero_evento(a, v, "danni: %s a zero" % nome, "testacoda e 2 punti persi", true)
+			a.testa = true
+			eventi.append({"t": "testacoda", "auto": a.i})
+			_lascia_segnalino(a)
+			a.dz = dz
+			_perdi_a_scelta(a, 2, zid)
+	a.dz = dz
+
+## Perde n punti nelle zone che ne hanno di più (i «PA a scelta» del regolamento).
+func _perdi_a_scelta(a: Dictionary, n: int, tranne := "") -> void:
+	var w := {}
+	for k in n:
+		var meglio := ""
+		var piu := 0
+		for z in Dati.zone_ids():
+			if z == tranne:
+				continue
+			var resta: int = int(a.pf[z]) - int(w.get(z, 0))
+			if resta > piu:
+				piu = resta
+				meglio = z
+		if meglio == "":
+			break
+		w[meglio] = int(w.get(meglio, 0)) + 1
+	_usura(a, w, "punti a scelta")
+
+## Ritiro con il «rischio pilota» (regolamento Lari).
+func _ritiro_grave(a: Dictionary, perche: String) -> void:
+	_elimina(a, perche)
+	var v := _nero_pp(a, func(x): return x == 1 or x == 20, "rischio pilota")
+	if v == 1:
+		a.rischio = "rip"
+		_nero_evento(a, v, "rischio pilota", "un incidente terribile: il suo nome resterà negli annali", true)
+	elif v == 20:
+		a.rischio = "frattura"
+		_nero_evento(a, v, "rischio pilota", "frattura: salterà la prossima gara", true)
+	else:
+		_nero_evento(a, v, "rischio pilota", "esce illeso", false)
 
 func _elimina(a: Dictionary, perche: String) -> void:
 	if a.fuori or a.posto_arrivo > 0:
@@ -305,7 +439,8 @@ func marce(a: Dictionary) -> Array:
 		return out
 	var da: int = a.marcia
 	var esente := _in_pit(a)
-	for m in range(1, min(6, da + 1) + 1):
+	var lim := int(a.get("lim_marcia", 0))
+	for m in range(1, min(6 if lim <= 0 else lim, da + 1) + 1):
 		var costo := {}
 		if m < da - 1 and not esente:
 			var saltate := da - m - 1
@@ -319,9 +454,11 @@ func marce(a: Dictionary) -> Array:
 				costo = {"ps": saltate}
 		var fuori := false
 		for z in Dati.zone(s.regole):
-			if z.has("fuori") and z.id != "gomme" and a.pf[z.id] - int(costo.get(z.id, 0)) <= z.fuori:
+			if z.id != "gomme" and _esce(a, z, a.pf[z.id] - int(costo.get(z.id, 0))):
 				fuori = true
 		out.append({"m": m, "costo": costo, "fuori": fuori})
+	if out.is_empty() and lim > 0:
+		out.append({"m": lim, "costo": {}, "fuori": false})
 	return out
 
 # ------------------------------------------------------------------ mosse
@@ -376,7 +513,7 @@ func _effetto(a: Dictionary, o: Dictionary, suo_box: bool) -> Dictionary:
 			var resta: int = a.pf[z.id] - int(e.usura.get(z.id, 0))
 			if suo_box and ((avanzate() and z.id == "gomme") or not avanzate()):
 				resta = _inizio(a, z.id)
-			if resta <= z.fuori:
+			if _esce(a, z, resta):
 				e.fuori = "%s a zero" % z.nome
 				break
 	return e
@@ -456,7 +593,7 @@ func anteprima(a: Dictionary, opz: Dictionary) -> Dictionary:
 				if e.finisce:
 					voce["fi"] = true
 				var ex: Dictionary = r[cid].get("extra", {})
-				for k in [["ni", "ni"], ["pi", "piu"], ["jk", "jk"]]:
+				for k in [["ni", "ni"], ["pi", "piu"], ["jk", "jk"], ["fg", "fg"], ["pk", "pk"], ["co", "co"]]:
 					if int(ex.get(k[1], 0)) != 0:
 						voce[k[0]] = int(ex[k[1]])
 				if int(r[cid].get("scia", 0)) > 0:
@@ -473,8 +610,18 @@ func _aggiunte(a: Dictionary) -> Array:
 		return out
 	var morbide: bool = s.get("meteo_on", false) and a.get("gomme_tipo", "") == "morbide" and not pioggia() \
 		and int(a.get("eta", 0)) < 1
+	if morbide and lari() and (int(a.pf.get("carrozzeria", 1)) <= 0 or int(a.pf.get("tenuta", 1)) <= 0):
+		morbide = false
 	if morbide:
 		out.append({"v": 1, "ni": 0})
+	# fuori giri (regolamento Lari): dal rettilineo, 1 Motore per tante caselle quanto la marcia
+	var da = pista.per_id.get(a.c)
+	if lari() and da != null and int(da.c) == 0 and int(a.pf.get("motore", 0)) >= 1 and a.marcia >= 1 and a.partito:
+		out.append({"v": int(a.marcia), "ni": 0, "fg": int(a.marcia)})
+	# KERS: 1, 2 o 3 punti per 1, 2 o 4 caselle
+	if s.get("kers", false) and int(a.get("pk", 0)) > 0:
+		var pk := int(a.pk)
+		out.append({"v": [0, 1, 2, 4][pk], "ni": 0, "pk": pk})
 	if s.get("nitro", s.get("strada", false)) and int(a.get("nitro", -99)) != a.giro and a.marcia >= 1:
 		var bonus := [int(a.marcia)]
 		if chi(a, "montoya"):
@@ -514,39 +661,66 @@ func opzioni_per(a: Dictionary, tiro: int) -> Dictionary:
 	var sciv := _scivola(a)
 	var jack := [0, -1, 1] if chi(a, "jack") and not _in_pit(a) else [0]
 	var litsu: bool = _c_e("litsu") and not chi(a, "litsu")
-	var dist := {}
-	for g in agg:
-		for j in jack:
-			for r in [0, sciv]:
-				for l in [0, -1 if litsu else 0]:
-					var d: int = tiro + int(g.v) + j + r + l
-					if d >= 1:
-						dist[d] = true
 	var reach := {}
 	var pesi := {}
-	for d in dist:
-		var r1 := Mosse.raggiungi(pista, a.c, d, {"occupate": occupate, "fermate": a.ferm, "pit": _puo_pit(a),
-			"posto": a.posto, "costo": costo})
-		for cid in r1:
-			var o: Dictionary = r1[cid]
-			if pista.per_id[cid].pit:
-				o.freno = 0
-			var curva := _tocca_curva(o.percorso)
-			var base: int = tiro + (sciv if curva else 0) - (1 if litsu and o.traguardo else 0)
-			var scelta = null
-			for g in agg:
-				for j in (jack if curva else [0]):
-					if scelta == null and base + int(g.v) + j == d:
-						scelta = {"ni": int(g.ni), "jk": j, "piu": int(g.v)}
-			if scelta == null:
-				continue
-			o.extra = scelta
-			var peso: float = _costo(a, o) + (1.0 if scelta.jk != 0 else 0.0) + (0.01 if scelta.ni > 0 else 0.0) + 0.001 * scelta.piu
-			if not pesi.has(cid) or peso < pesi[cid]:
-				pesi[cid] = peso
-				reach[cid] = o
+	var fatte := {}
+	var cache := {}
+	var passo := func(cordoli: Array) -> bool:
+		var dist := {}
+		for g in agg:
+			for j in jack:
+				for r in [0, sciv]:
+					for l in [0, -1 if litsu else 0]:
+						for co in cordoli:
+							var d: int = tiro + int(g.v) + j + r + l + co
+							if d >= 1 and not fatte.has(d):
+								dist[d] = true
+		var curve := false
+		for d in dist:
+			fatte[d] = true
+			if not cache.has(d):
+				cache[d] = Mosse.raggiungi(pista, a.c, d, {"occupate": occupate, "fermate": a.ferm, "pit": _puo_pit(a),
+					"posto": a.posto, "costo": costo})
+			var r1: Dictionary = cache[d]
+			for cid in r1:
+				var o: Dictionary = r1[cid].duplicate()
+				if pista.per_id[cid].pit:
+					o.freno = 0
+				var curva := _tocca_curva(o.percorso)
+				curve = curve or curva
+				var base: int = tiro + (sciv if curva else 0) - (1 if litsu and o.traguardo else 0)
+				var scelta = null
+				for g in agg:
+					for j in (jack if curva else [0]):
+						for co in cordoli:
+							if scelta != null or base + int(g.v) + j + co != d:
+								continue
+							if (int(g.get("fg", 0)) > 0 or co != 0) and int(o.freno) > 0:
+								continue
+							if co != 0 and (int(g.v) != 0 or j != 0 or not _cordolo_ok(o.percorso, co)):
+								continue
+							scelta = {"ni": int(g.ni), "jk": j, "piu": int(g.v), "fg": int(g.get("fg", 0)), "pk": int(g.get("pk", 0)), "co": co}
+				if scelta == null:
+					continue
+				o.extra = scelta
+				var peso: float = _costo(a, o) + (1.0 if scelta.jk != 0 else 0.0) + (0.01 if scelta.ni > 0 else 0.0) + 0.001 * scelta.piu \
+					+ (0.6 if scelta.fg > 0 else 0.0) + (0.3 if scelta.pk > 0 else 0.0) + (0.4 if scelta.co != 0 else 0.0)
+				if not pesi.has(cid) or peso < pesi[cid]:
+					pesi[cid] = peso
+					reach[cid] = o
+		return curve
+	var con_curve: bool = passo.call([0])
+	# i cordoli (regolamento Lari) servono solo se la mossa arriva a una curva
+	if lari() and not _in_pit(a) and (con_curve or int(pista.per_id[a.c].c) > 0):
+		fatte.clear()
+		passo.call([1, -2])
 	if avanzate():
-		var altre := Mosse.scia(pista, reach, {"occupate": occupate, "marce": marce_altre, "marcia": a.marcia,
+		# dopo il fuori giri non si prende la scia
+		var per_scia := {}
+		for cid in reach:
+			if int(reach[cid].get("extra", {}).get("fg", 0)) == 0:
+				per_scia[cid] = reach[cid]
+		var altre := Mosse.scia(pista, per_scia, {"occupate": occupate, "marce": marce_altre, "marcia": a.marcia,
 			"min_marcia": 4, "spazi": 3, "posto": a.posto, "costo": costo})
 		for cid in altre:
 			if not reach.has(cid) or _costo(a, altre[cid]) < _costo(a, reach[cid]):
@@ -566,8 +740,12 @@ func opzioni_per(a: Dictionary, tiro: int) -> Dictionary:
 			oe = o.duplicate()
 			oe.freno = 0
 		var e := _effetto(a, oe, suo_box)
-		if int(o.get("extra", {}).get("jk", 0)) != 0:
+		var exo: Dictionary = o.get("extra", {})
+		if int(exo.get("jk", 0)) != 0:
 			e.usura["gomme"] = int(e.usura.get("gomme", 0)) + 1
+		if int(exo.get("fg", 0)) > 0:
+			e.usura["motore"] = int(e.usura.get("motore", 0)) + 1
+		e.cordolo = int(exo.get("co", 0)) != 0
 		e.box = suo_box
 		e.finisce = finisce and e.fuori == ""
 		if e.finisce:
@@ -584,7 +762,107 @@ func opzioni_per(a: Dictionary, tiro: int) -> Dictionary:
 				if segnati.has(o.percorso[k]):
 					e.pericoli.append(o.percorso[k])
 		o.eff = e
+	if lari():
+		_tamponamento(a, reach)
 	return reach
+
+## Il cordolo si può usare con quel percorso? +1 (interno): almeno una casella interna di una curva;
+## -2 (esterno): finisce sulla terza di almeno tre caselle esterne di fila nella stessa curva.
+func _cordolo_ok(percorso: Array, co: int) -> bool:
+	if co > 0:
+		for k in range(1, percorso.size()):
+			if _bordo(percorso[k]) > 0:
+				return true
+		return false
+	var n := percorso.size()
+	if n < 4:
+		return false
+	var curva := int(pista.per_id[percorso[n - 1]].c)
+	if curva <= 0:
+		return false
+	for k in range(n - 3, n):
+		var c = pista.per_id[percorso[k]]
+		if int(c.c) != curva or _bordo(percorso[k]) >= 0:
+			return false
+	return true
+
+## In curva: 1 se la casella è nella corsia interna, -1 se nell'esterna, 0 altrimenti.
+func _bordo(cid: String) -> int:
+	var c = pista.per_id.get(cid)
+	if c == null or int(c.c) <= 0 or c.pit:
+		return 0
+	var mio := pista.interno(cid)
+	var piu := true
+	var meno := true
+	var altri := 0
+	for v in pista.vicini.get(cid, []):
+		var o = pista.per_id.get(v)
+		if o == null or o.pit or int(o.c) != int(c.c) or int(o.l) == int(c.l):
+			continue
+		altri += 1
+		if pista.interno(v) >= mio:
+			piu = false
+		if pista.interno(v) <= mio:
+			meno = false
+	if altri == 0:
+		return 0
+	return 1 if piu else (-1 if meno else 0)
+
+## Strada bloccata (regolamento Lari): se non c'è modo di frenare abbastanza, oltre la sesta casella si pagano
+## altri punti a scelta; se non bastano, tamponamento contro l'auto davanti.
+func _tamponamento(a: Dictionary, reach: Dictionary) -> void:
+	var minimo := 999
+	for cid in reach:
+		minimo = min(minimo, int(reach[cid].freno))
+	if minimo <= FRENATA_MASSIMA or reach.is_empty():
+		return
+	var tenere := ""
+	for cid in reach:
+		if int(reach[cid].freno) == minimo and (tenere == "" or reach[cid].eff.fuori == ""):
+			tenere = cid
+	for cid in reach.keys():
+		if cid != tenere:
+			reach.erase(cid)
+	var o: Dictionary = reach[tenere]
+	var oo := o.duplicate()
+	oo.freno = FRENATA_MASSIMA
+	var e := _effetto(a, oo, false)
+	var extra: int = int(o.freno) - FRENATA_MASSIMA
+	var base_u: Dictionary = e.usura.duplicate()
+	var pf: Dictionary = a.pf.duplicate()
+	for k in e.usura:
+		pf[k] -= int(e.usura[k])
+	var pagati := 0
+	while pagati < extra:
+		var meglio := ""
+		var piu := 0
+		for z in ["cambio", "motore", "tenuta", "carrozzeria"]:
+			var minimo_z := 1 if ZONE_TABELLA.has(z) else 0
+			if int(pf[z]) - minimo_z > piu:
+				piu = int(pf[z]) - minimo_z
+				meglio = z
+		if meglio == "":
+			break
+		pf[meglio] -= 1
+		e.usura[meglio] = int(e.usura.get(meglio, 0)) + 1
+		pagati += 1
+	e.tampona = -1
+	e.crash = pagati < extra
+	if e.crash:
+		# tanto si sbatte: i punti in più non servono
+		e.usura = base_u
+		# non basta: si tampona l'auto davanti
+		var c = pista.per_id[tenere]
+		for b in s.auto:
+			if b.i != a.i and in_gara(b) and b.c != "" and (Array(c.n).has(b.c) or pista.vicini.get(tenere, []).has(b.c)):
+				e.tampona = b.i
+				break
+	e.box = o.eff.box
+	e.finisce = o.eff.finisce
+	e.tocca = o.eff.tocca
+	e.pericoli = o.eff.pericoli
+	e.cordolo = false
+	o.eff = e
 
 # ------------------------------------------------------------------ il giro di gioco
 
@@ -651,6 +929,7 @@ func avanza() -> void:
 		return
 	while s.fase == "gara" and s.attesa == null:
 		if _in_corsa() == 0:
+			_ordina_arrivi()
 			s.fase = "fine"
 			eventi.append({"t": "fine"})
 			var nomi := []
@@ -662,6 +941,7 @@ func avanza() -> void:
 			return
 		var a = di_turno()
 		if a == null:
+			_ordina_arrivi()
 			s.turno += 1
 			_riordina()
 			eventi.append({"t": "turno", "n": s.turno, "ordine": s.ordine.duplicate()})
@@ -786,7 +1066,7 @@ func _scegli_marcia(a: Dictionary, opz: Dictionary) -> void:
 		_fine_mossa(a)
 		return
 	var facce: Array = Dati.DADI[opz.m]
-	var k := rng.randi() % facce.size()
+	var k := _faccia(a, facce)
 	var v := int(facce[k][0])
 	var in_pit := _in_pit(a)
 	a.marcia = opz.m
@@ -796,7 +1076,29 @@ func _scegli_marcia(a: Dictionary, opz: Dictionary) -> void:
 	eventi.append({"t": "dado", "auto": a.i, "marcia": opz.m, "valore": v, "faccia": k})
 	_msg("%s innesta la %s e tira %d" % [a.nome, Dati.NOMI_MARCE[opz.m], v], "tiro", a.i)
 	s.sforzo = int(Dati.SFORZO.get(opz.m, 0)) == v and not in_pit
+	_kers(a, v)
 	_apri_mossa(a, v)
+
+## La faccia del dado: con il motore senza potenza sempre la più bassa.
+func _faccia(a: Dictionary, facce: Array) -> int:
+	if str(a.get("dz", {}).get("motore", "")) == "potenza":
+		var k0 := 0
+		for k in facce.size():
+			if int(facce[k][0]) < int(facce[k0][0]):
+				k0 = k
+		return k0
+	return rng.randi() % facce.size()
+
+## KERS: i due numeri più alti del dado dalla 4a in su danno un punto (al massimo 3).
+func _kers(a: Dictionary, v: int) -> void:
+	if not s.get("kers", false) or a.marcia < 4:
+		return
+	var alto := 0
+	for f in Dati.DADI[a.marcia]:
+		alto = max(alto, int(f[0]))
+	if v >= alto - 1 and int(a.get("pk", 0)) < 3:
+		a.pk = int(a.get("pk", 0)) + 1
+		_msg("%s carica il KERS: %d punt%s" % [a.nome, a.pk, "o" if a.pk == 1 else "i"], "info", a.i)
 
 ## Riceve una decisione: {t: "marcia", m} oppure {t: "mossa", c}. Ritorna false se non è valida.
 func applica(az: Dictionary) -> bool:
@@ -843,12 +1145,13 @@ func applica(az: Dictionary) -> bool:
 		a.pp -= 1
 		_msg("%s usa un Punto Pilota e ritira il dado (ne restano %d)" % [a.nome, a.pp], "avviso", a.i)
 		var facce: Array = Dati.DADI[a.marcia]
-		var k := rng.randi() % facce.size()
+		var k := _faccia(a, facce)
 		var v := int(facce[k][0])
 		a.dado = v
 		eventi.append({"t": "dado", "auto": a.i, "marcia": a.marcia, "valore": v, "faccia": k})
 		_msg("%s ritira e fa %d" % [a.nome, v], "tiro", a.i)
 		s.sforzo = int(Dati.SFORZO.get(a.marcia, 0)) == v and not _in_pit(a)
+		_kers(a, v)
 		_apri_mossa(a, v)
 		return true
 	if s.attesa.tipo == "mossa" and az.get("t") == "mossa":
@@ -875,6 +1178,22 @@ func _muovi(a: Dictionary, cid: String) -> void:
 		eventi.append({"t": "nitro", "auto": a.i, "v": int(ex.ni)})
 	if int(ex.get("jk", 0)) != 0:
 		_msg("%s derapa in curva (%s1 casella, 1 Gomme)" % [a.nome, "+" if ex.jk > 0 else "-"], "info", a.i)
+	if int(ex.get("pk", 0)) > 0:
+		_msg("%s usa il KERS: +%d caselle" % [a.nome, int(ex.piu)], "avviso", a.i)
+		a.pk = 0
+	if int(ex.get("co", 0)) != 0:
+		_msg("%s sfrutta il cordolo %s (%s)" % [a.nome, "interno" if ex.co > 0 else "esterno", "+1" if ex.co > 0 else "-2"], "info", a.i)
+	if int(ex.get("fg", 0)) > 0:
+		# fuori giri: 1 Motore, senza lasciare detriti
+		_msg("%s manda il motore fuori giri: +%d caselle, 1 Motore" % [a.nome, int(ex.fg)], "avviso", a.i)
+		e = e.duplicate(true)
+		e.usura.motore = int(e.usura.get("motore", 0)) - 1
+		if e.usura.motore <= 0:
+			e.usura.erase("motore")
+		a.pf.motore -= 1
+		eventi.append({"t": "usura", "auto": a.i, "usura": {"motore": 1}, "motivo": "fuori giri", "pf": a.pf.duplicate()})
+		if int(a.pf.motore) < 0:
+			a.pf.motore = 0
 	# Temana Matahi lascia detriti dove parte, se ha qualcuno dietro
 	if chi(a, "temana") and int(a.get("scarto", -99)) != a.giro and not _in_pit(a) and da_c != "":
 		for b in s.auto:
@@ -895,6 +1214,13 @@ func _muovi(a: Dictionary, cid: String) -> void:
 		if not e.usura.is_empty():
 			_usura(a, e.usura, "lungo all'ultima curva", false)
 		a.giro += 1
+		# caselle oltre la linea: decidono l'ordine fra chi arriva nello stesso turno
+		var oltre_l := 0
+		for k in range(1, o.percorso.size()):
+			if pista.traguardo.has(o.percorso[k]) and not pista.traguardo.has(o.percorso[k - 1]):
+				oltre_l = o.percorso.size() - k
+		a.arr_turno = s.turno
+		a.arr_oltre = oltre_l
 		_arriva(a)
 	else:
 		if o.traguardo:
@@ -924,6 +1250,24 @@ func _muovi(a: Dictionary, cid: String) -> void:
 		if e.fuori != "":
 			_elimina(a, e.fuori)
 		_controlla_fuori(a)
+		if e.get("crash", false) and in_gara(a):
+			var b_t := int(e.get("tampona", -1))
+			var contro: String = s.auto[b_t].nome if b_t >= 0 else "le auto davanti"
+			_msg("%s non riesce a fermarsi e tampona %s!" % [a.nome, contro], "avviso", a.i)
+			eventi.append({"t": "urto", "auto": a.i, "contro": max(b_t, a.i), "colpo": true})
+			if int(a.pf.carrozzeria) > 0:
+				_usura(a, {"carrozzeria": int(a.pf.carrozzeria)}, "tamponamento", false)
+			_danno_grave(a, "carrozzeria")
+			if b_t >= 0 and in_gara(s.auto[b_t]):
+				_usura(s.auto[b_t], {"carrozzeria": 1}, "tamponata da %s" % a.nome)
+		if e.get("cordolo", false) and in_gara(a):
+			var soglia_c := 5 if pioggia() else 4
+			var vc := _nero_pp(a, func(x): return x <= soglia_c and int(a.pf.get("tenuta", 1)) <= 0, "sospensioni")
+			if vc <= soglia_c:
+				_nero_evento(a, vc, "cordolo", "le sospensioni soffrono", true)
+				_usura(a, {"tenuta": 1}, "cordolo")
+			else:
+				_nero_evento(a, vc, "cordolo", "sospensioni a posto", false)
 	# i segnalini lasciati durante la mossa vanno dove è finita
 	for k in _segnalini_in_sospeso:
 		_metti_segnalino(cid)
@@ -944,7 +1288,7 @@ func _muovi(a: Dictionary, cid: String) -> void:
 		for pid in e.pericoli:
 			if not in_gara(a):
 				break
-			var v := _nero()
+			var v := _nero_pp(a, func(x): return x <= soglia_d and int(a.pf.get("tenuta", 1)) <= 0, "detriti")
 			if v <= soglia_d:
 				_nero_evento(a, v, "detriti", "l'auto prende un colpo", true)
 				_usura(a, {"tenuta": 1}, "detriti in pista")
@@ -957,8 +1301,8 @@ func _muovi(a: Dictionary, cid: String) -> void:
 		_msg("Motore sotto sforzo! Tutte le auto in 5a e 6a tirano il dado nero", "avviso", a.i)
 		for b in s.auto:
 			if in_gara(b) and (b.marcia == 5 or b.marcia == 6) and not _in_pit(b):
-				var v := _nero()
 				var soglia_m := (3 if pioggia() else 4) - (1 if chi(b, "dimitri") else 0)
+				var v := _nero_pp(b, func(x): return x <= soglia_m and int(b.pf.get("motore", 1)) <= 0, "motore")
 				if v <= soglia_m:
 					_nero_evento(b, v, "motore", "il motore soffre", true)
 					_usura(b, {"motore": 1} if avanzate() else {"ps": 1}, "motore sotto sforzo")
@@ -985,6 +1329,13 @@ func _fine_mossa(a: Dictionary) -> void:
 		_metti_segnalino(a.c if a.c != "" else str(a.get("dove", "")))
 	_segnalini_in_sospeso = 0
 	a.mosso = s.turno
+	if in_gara(a) and str(a.get("dz", {}).get("motore", "")) == "affidabile":
+		var v := _nero_pp(a, func(x): return x <= int(a.marcia), "affidabilità")
+		if v <= int(a.marcia):
+			_nero_evento(a, v, "prova di affidabilità", "il motore cede", true)
+			_elimina(a, "motore ceduto")
+		else:
+			_nero_evento(a, v, "prova di affidabilità", "il motore regge", false)
 	if a.fuori:
 		a.c = ""
 
@@ -993,8 +1344,9 @@ func _collisione(a: Dictionary, b: Dictionary) -> void:
 	for k in (2 if chi(b, "derek") else 1):
 		if not in_gara(a):
 			return
-		var v := _nero()
-		var colpo := v <= (2 if pioggia() else 1) if avanzate() else v <= 4
+		var soglia_u := (2 if pioggia() else 1) if avanzate() else 4
+		var v := _nero_pp(a, func(x): return x <= soglia_u and int(a.pf.get("carrozzeria", 1)) <= 0, "collisione")
+		var colpo := v <= soglia_u
 		eventi.append({"t": "urto", "auto": a.i, "contro": b.i, "colpo": colpo})
 		if colpo:
 			_nero_evento(a, v, "contatto con %s" % b.nome, "collisione!", true)
@@ -1061,12 +1413,49 @@ func _sosta(a: Dictionary) -> int:
 		_msg("%s si ferma al box: tutti i PS recuperati, ripartirà al massimo in 4a" % a.nome, "info", a.i)
 		return 0
 	_msg("%s si ferma al box: gomme nuove" % a.nome, "info", a.i)
+	if lari():
+		return _sosta_lari(a)
 	var v := _nero()
 	if v <= 10:
 		var n := int(ceil(v / 2.0))
 		_nero_evento(a, v, "sosta ai box", "sosta rapida! Riparte subito in 4a per %d casell%s" % [n, "a" if n == 1 else "e"], false)
 		return n
 	_nero_evento(a, v, "sosta ai box", "sosta lenta: riparte al prossimo turno, al massimo in 4a", false)
+	return 0
+
+## Sosta con il regolamento Lari: i meccanici riparano (1 punto meccanico per punto, prima le zone danneggiate),
+## poi il dado nero dice di quanto si riparte subito in 4a (2, 3 o 4 caselle) o se si resta fermi un turno.
+func _sosta_lari(a: Dictionary) -> int:
+	var fatti := []
+	while int(a.get("pmec", 0)) > 0:
+		var meglio := ""
+		var manca := 0
+		for z in ["carrozzeria", "motore", "tenuta", "freni", "cambio"]:
+			var m: int = _inizio(a, z) - int(a.pf[z]) + (10 if a.get("dz", {}).has(z) else 0)
+			if m > manca and int(a.pf[z]) < _inizio(a, z):
+				manca = m
+				meglio = z
+		if meglio == "":
+			break
+		a.pf[meglio] += 1
+		a.pmec -= 1
+		fatti.append(Dati.nome_zona(s.regole, meglio))
+		if a.get("dz", {}).has(meglio):
+			a.dz.erase(meglio)
+			if meglio == "carrozzeria":
+				a.lim_marcia = 0
+	if not fatti.is_empty():
+		_msg("%s: i meccanici riparano +1 %s (restano %d punti meccanici)" % [a.nome, ", +1 ".join(fatti), int(a.pmec)], "info", a.i)
+		eventi.append({"t": "box", "auto": a.i, "pf": a.pf.duplicate()})
+	var v := _nero()
+	for r in BOX_LARI:
+		if v <= int(r[0]):
+			var n := int(r[1])
+			if n > 0:
+				_nero_evento(a, v, "sosta ai box", "sosta rapida! Riparte subito in 4a per %d caselle" % n, false)
+			else:
+				_nero_evento(a, v, "sosta ai box", "problemi ai box: riparte al prossimo turno, al massimo in 4a", false)
+			return n
 	return 0
 
 ## Le fermate nella curva in cui si trova l'auto: [fatte, obbligatorie], vuoto se non è in curva.
@@ -1087,6 +1476,43 @@ func _storia(voce: Dictionary) -> void:
 	voce["tr"] = int(s.turno)
 	s.storia.mosse.append(voce)
 
+## Chi arriva nello stesso turno: vince chi va più oltre la linea; a parità chi l'ha tagliata prima.
+func _ordina_arrivi() -> void:
+	var gruppo := []
+	for i in s.arrivi:
+		if int(s.auto[i].get("arr_turno", -1)) == int(s.turno):
+			gruppo.append(s.auto[i])
+	if gruppo.size() < 2:
+		return
+	var posti := []
+	for a in gruppo:
+		posti.append(int(a.posto_arrivo))
+	posti.sort()
+	var ordinati := gruppo.duplicate()
+	ordinati.sort_custom(func(x, y):
+		if int(x.arr_oltre) != int(y.arr_oltre):
+			return int(x.arr_oltre) > int(y.arr_oltre)
+		return int(x.posto_arrivo) < int(y.posto_arrivo))
+	var cambia := false
+	for k in ordinati.size():
+		if int(ordinati[k].posto_arrivo) != posti[k]:
+			cambia = true
+		ordinati[k].posto_arrivo = posti[k]
+	for a in gruppo:
+		a.arr_turno = -1
+	if not cambia:
+		return
+	var nuovi := []
+	for i in s.arrivi:
+		nuovi.append(i)
+	nuovi.sort_custom(func(x, y): return int(s.auto[x].posto_arrivo) < int(s.auto[y].posto_arrivo))
+	s.arrivi = nuovi
+	var testo := []
+	for a in ordinati:
+		testo.append("%d. %s (%d oltre la linea)" % [int(a.posto_arrivo), a.nome, int(a.arr_oltre)])
+		eventi.append({"t": "arrivo", "auto": a.i, "posto": a.posto_arrivo})
+	_msg("Arrivo nello stesso turno, conta chi va più oltre il traguardo: " + "   ".join(testo), "arrivo")
+
 func _arriva(a: Dictionary) -> void:
 	s.arrivi.append(a.i)
 	a.posto_arrivo = s.arrivi.size()
@@ -1105,7 +1531,7 @@ func _arriva(a: Dictionary) -> void:
 func vista() -> Dictionary:
 	var v := {"regole": s.regole, "pista": s.pista, "giri": s.giri, "fase": s.fase, "turno": s.turno, "ordine": s.ordine,
 		"cl": classifica(), "danni": [], "auto": [], "att": null, "mt": int(s.get("meteo", -1)),
-		"str": s.get("strada", false), "abil": abilita(), "lib": s.get("libero", false), "mon": s.get("meteo_on", false)}
+		"str": s.get("strada", false), "abil": abilita(), "lari": lari(), "kers": s.get("kers", false), "lib": s.get("libero", false), "mon": s.get("meteo_on", false)}
 	for d in s.danni:
 		v.danni.append(d.c)
 	for a in s.auto:
@@ -1113,7 +1539,7 @@ func vista() -> Dictionary:
 			"f": a.fuori, "pa": a.posto_arrivo, "t": a.testa, "d": a.dado, "mo": a.mosso == s.turno, "w": a.perche,
 			"dv": a.get("dove", ""), "gt": a.get("gomme_tipo", "dure"), "et": int(a.get("eta", 0)),
 			"ni": s.get("nitro", s.get("strada", false)) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {}), "fs": _fermate_ora(a),
-			"pp": int(a.get("pp", 0))})
+			"pp": int(a.get("pp", 0)), "pk": int(a.get("pk", 0)), "pm": int(a.get("pmec", 0)), "dz": a.get("dz", {})})
 	if s.has("q"):
 		v["q"] = s.q
 	if s.has("camp"):
@@ -1150,7 +1576,9 @@ func vista() -> Dictionary:
 				l.append({"c": cid, "x": int(p.x), "y": int(p.y), "mo": o.mosse, "u": e.usura, "fu": e.fuori, "te": e.testa,
 					"bx": e.box, "fi": e.finisce, "to": e.tocca.size(), "pe": e.pericoli.size(), "sc": int(o.get("scia", 0)),
 					"fr": o.freno, "ol": o.oltre, "ni": int(o.get("extra", {}).get("ni", 0)), "jk": int(o.get("extra", {}).get("jk", 0)),
-					"pi": int(o.get("extra", {}).get("piu", 0)), "r": snappedf(float(pista.per_id[cid].r), 0.1)})
+					"pi": int(o.get("extra", {}).get("piu", 0)), "fg": int(o.get("extra", {}).get("fg", 0)),
+					"pk": int(o.get("extra", {}).get("pk", 0)), "co": int(o.get("extra", {}).get("co", 0)),
+					"tp": e.get("crash", false), "r": snappedf(float(pista.per_id[cid].r), 0.1)})
 			att.opz = l
 			att.pp = int(a.get("pp", 0))
 		v.att = att

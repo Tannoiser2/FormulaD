@@ -259,7 +259,7 @@ func aggiorna(vista: Dictionary, mie: Array) -> void:
 	var giro_max := 0
 	for a in v.auto:
 		giro_max = max(giro_max, int(a.g))
-	var info := "%s%s  -  Turno %d  -  Giro %d di %d" % [Dati.NOMI_REGOLE[v.regole], "  -  Su strada" if v.get("str", false) else "",
+	var info := "%s%s  -  Turno %d  -  Giro %d di %d" % [("Regolamento Lari" if v.get("lari", false) else Dati.NOMI_REGOLE[v.regole]), "  -  Su strada" if v.get("str", false) else "",
 		int(v.turno), clamp(giro_max, 1, int(v.giri)), int(v.giri)]
 	if str(v.fase) == "qualifiche" and v.has("q"):
 		var q: Dictionary = v.q
@@ -290,6 +290,7 @@ func mostra_plancia(i: int) -> void:
 		extra += "  -  gomme %s" % Dati.NOMI_GOMME[str(a.get("gt", "dure"))].to_lower()
 	if v.get("str", false):
 		extra += "  -  Nitro %s" % ("pronto" if a.get("ni", false) else "usato")
+	extra += Interfaccia.testo_danni(v, a)
 	plancia_nome.text = "%s  -  %s%s%s" % [a.n, Dati.NOMI_MARCE[int(a.m)] if int(a.m) > 0 else "in griglia",
 		"  -  tiro %d" % int(a.d) if int(a.d) > 0 else "", extra]
 	plancia_nome.clip_text = true
@@ -617,6 +618,21 @@ func _esito(tiro: int, liv: int, persi: int) -> Control:
 	vb.add_child(giu)
 	return p
 
+## KERS, meccanici e danni gravi di un'auto, per la riga sopra la plancia.
+static func testo_danni(v: Dictionary, a: Dictionary) -> String:
+	var t := ""
+	if v.get("kers", false):
+		t += "  -  KERS %d" % int(a.get("pk", 0))
+	if v.get("lari", false):
+		t += "  -  meccanici %d" % int(a.get("pm", 0))
+		var nomi := {"musetto": "senza musetto (max 3a)", "potenza": "motore senza potenza", "affidabile": "motore da controllare",
+			"sospensioni": "sospensioni rotte", "testacoda": ""}
+		for z in a.get("dz", {}):
+			var n: String = nomi.get(str(a.dz[z]), "")
+			if n != "":
+				t += "  -  " + n
+	return t
+
 static func testo_opzione(regole: String, o: Dictionary) -> String:
 	var parti := []
 	if int(o.mo) == 0:
@@ -633,6 +649,14 @@ static func testo_opzione(regole: String, o: Dictionary) -> String:
 		parti.append("con il Nitro (+%d)" % int(o.ni))
 	if int(o.get("jk", 0)) != 0:
 		parti.append("derapata")
+	if int(o.get("fg", 0)) > 0:
+		parti.append("con il motore fuori giri (+%d, 1 Motore)" % int(o.fg))
+	if int(o.get("pk", 0)) > 0:
+		parti.append("con il KERS (+%d)" % int(o.pi))
+	if int(o.get("co", 0)) != 0:
+		parti.append("sul cordolo %s" % ("interno (+1)" if int(o.co) > 0 else "esterno (-2)"))
+	if o.get("tp", false):
+		parti.append("TAMPONA l'auto davanti")
 	var t := ", ".join(parti) + "."
 	if o.fi:
 		return t + " TRAGUARDO!"

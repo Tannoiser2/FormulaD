@@ -25,13 +25,15 @@ func _init():
 	await _foto(dir, "3_prepara")
 	main.menu.abilita = true
 	main.menu.nitro = true
+	main.menu.lari = true
+	main.menu.kers = true
 	main.menu.preparazione()
 	await create_timer(0.3).timeout
 	await _foto(dir, "4_prepara_abilita")
 	main._comando("regole")
 	await create_timer(0.3).timeout
 	await _foto(dir, "5_regole")
-	main.hud._capitolo(12)
+	main.hud._capitolo(13)
 	await create_timer(0.3).timeout
 	await _foto(dir, "6_regole_camp")
 	main.hud.chiudi_velo()
