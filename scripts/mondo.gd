@@ -5,6 +5,7 @@ extends Node3D
 
 signal casella_toccata(cid: String)
 signal casella_mappa(cid: String)   # con la mappatura accesa: la casella toccata, per vederne i collegamenti
+signal tocco_mappa(p: Vector2, cid: String)   # con la mappatura accesa: il punto toccato (pixel del tabellone) e la casella più vicina
 
 const SCALA := 0.01          # 1 pixel del tabellone = 1 cm
 const COL_LIBERA := Color(0.15, 0.95, 0.3)
@@ -41,6 +42,7 @@ var _mat_segno := {}
 var _prec_due: Array = []
 ## Detto dall'interfaccia: vero se il punto è sopra un pannello (il tocco non deve arrivare al tabellone).
 var sopra_ui: Callable
+var editor_attivo := false   # l'editor delle piste decide lui cosa segnare sulla mappatura
 
 ## false: la telecamera resta dove l'ha messa il giocatore e non insegue le mosse
 var segui := true
@@ -84,6 +86,10 @@ func _ready() -> void:
 func mondo_da(p: Vector2) -> Vector3:
 	return Vector3((p.x - pista.img.x * 0.5) * SCALA, 0, (p.y - pista.img.y * 0.5) * SCALA)
 
+## Il contrario di mondo_da: dal punto sul tavolo ai pixel del tabellone.
+func da_mondo(q: Vector3) -> Vector2:
+	return Vector2(q.x / SCALA + pista.img.x * 0.5, q.z / SCALA + pista.img.y * 0.5)
+
 func pos_casella(cid: String) -> Vector3:
 	return mondo_da(pista.pos(cid))
 
@@ -122,6 +128,23 @@ func vista_generale(subito := false) -> void:
 		distanza = _distanza_t
 		imbardata = 0.0
 		inclinazione = 1.05
+
+## Il tabellone visto dall'alto, tutto dentro la parte di schermo lasciata libera a sinistra (per l'editor).
+func vista_dall_alto(libero_destra_px := 0.0) -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var asp: float = vp.x / max(vp.y, 1.0)
+	var quota: float = clamp(1.0 - libero_destra_px / max(vp.x, 1.0), 0.3, 1.0)
+	var t: float = tan(deg_to_rad(cam.fov if cam else 50.0) * 0.5)
+	var w: float = pista.img.x * SCALA * 1.04
+	var h: float = pista.img.y * SCALA * 1.04
+	var d: float = max(h / (2.0 * t), w / (2.0 * t * asp * quota))
+	var largo_vista: float = 2.0 * d * t * asp
+	_bersaglio_t = Vector3(largo_vista * (1.0 - quota) * 0.5, 0, 0)
+	_distanza_t = d
+	bersaglio = _bersaglio_t
+	distanza = d
+	imbardata = 0.0
+	inclinazione = 1.55
 
 ## Inquadra un gruppo di caselle (l'auto che muove e dove può arrivare).
 func inquadra(caselle: Array, margine := 2.2, comunque := false) -> void:
@@ -612,8 +635,10 @@ func _tocco(p: Vector2) -> void:
 			if dd < bd:
 				bd = dd
 				best = c.id
+		tocco_mappa.emit(da_mondo(q), best)
 		if best != "":
-			segna_mappa(best)
+			if not editor_attivo:
+				segna_mappa(best)
 			casella_mappa.emit(best)
 
 func _unhandled_input(ev: InputEvent) -> void:
@@ -794,29 +819,26 @@ func mostra_mappa(si: bool) -> void:
 		return
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var lungo: float = pista.cella * SCALA * 0.92
-	var largo: float = pista.largo_cella * SCALA * 0.9
+	var largo: float = pista.largo_cella * SCALA
 	var h := 0.035
+	# prima le freccette dei collegamenti, poi i pallini sopra
 	for c in pista.caselle:
 		var p := pos_casella(c.id) + Vector3(0, h, 0)
-		var a := -deg_to_rad(float(c.r))
-		var ax := Vector3(cos(a), 0, -sin(a)) * lungo * 0.5
-		var az := Vector3(sin(a), 0, cos(a)) * largo * 0.5
-		var col: Color = COL_CORSIA.get(int(c.l), Color.WHITE)
-		var k := [p - ax - az, p + ax - az, p + ax + az, p - ax + az]
-		for j in 4:
-			_segmento(st, k[j], k[(j + 1) % 4], 0.012, col)
-		# freccette verso le caselle collegate
 		for nid in c.get("n", []):
-			var q := pos_casella(nid) + Vector3(0, h + 0.003, 0)
+			if not pista.per_id.has(nid):
+				continue
+			var q := pos_casella(nid) + Vector3(0, h, 0)
 			var stessa: bool = pista.per_id[nid].l == c.l
-			var cl := Color(1, 1, 1, 0.9) if stessa else Color(1, 0.2, 0.2, 0.95)
-			var fine := p.lerp(q, 0.82)
-			_segmento(st, p, fine, 0.008 if stessa else 0.01, cl)
+			var cl := Color(1, 1, 1, 0.85) if stessa else Color(1, 0.2, 0.2, 0.95)
+			var ini := p.lerp(q, 0.22)
+			var fine := p.lerp(q, 0.78)
+			_segmento(st, ini, fine, 0.007 if stessa else 0.009, cl)
 			var dir := (q - p).normalized()
-			var lat := dir.cross(Vector3.UP) * 0.035
-			_triangolo(st, fine + dir * 0.06, fine + lat, fine - lat, cl)
-		_quadratino(st, p, 0.035, col)
+			var lat := dir.cross(Vector3.UP) * 0.03
+			_triangolo(st, fine + dir * 0.05, fine + lat, fine - lat, cl)
+	var rr: float = clamp(largo * 0.26, 0.035, 0.09)
+	for c in pista.caselle:
+		_pallino(st, pos_casella(c.id) + Vector3(0, h, 0), float(c.r), rr, COL_CORSIA.get(int(c.l), Color.WHITE))
 	mappa = MeshInstance3D.new()
 	mappa.mesh = st.commit()
 	var m := StandardMaterial3D.new()
@@ -838,6 +860,58 @@ func _triangolo(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, col: Color)
 	for v in [a, b, c]:
 		st.set_color(col)
 		st.add_vertex(v)
+
+## Un pallino colorato con una punta che indica il verso della casella (bordo scuro sotto).
+func _pallino(st: SurfaceTool, p: Vector3, r_gradi: float, rr: float, col: Color, bordo := Color(0.05, 0.05, 0.08, 1)) -> void:
+	var a := deg_to_rad(r_gradi)
+	var av := Vector3(cos(a), 0, sin(a))
+	var lat := Vector3(-av.z, 0, av.x)
+	for passo in 2:
+		var r := rr * (1.28 if passo == 0 else 1.0)
+		var cc := bordo if passo == 0 else col
+		var punta := p + av * (rr * 1.95 if passo == 0 else rr * 1.75)
+		_triangolo(st, punta, p + lat * r * 0.8 + av * r * 0.45, p - lat * r * 0.8 + av * r * 0.45, cc)
+		var n := 16
+		for k in n:
+			var t0 := TAU * k / n
+			var t1 := TAU * (k + 1) / n
+			_triangolo(st, p, p + Vector3(cos(t0), 0, sin(t0)) * r, p + Vector3(cos(t1), 0, sin(t1)) * r, cc)
+
+## Segna le caselle scelte nell'editor: anello giallo la prima, azzurro la seconda.
+var _mappa_scelte: MeshInstance3D
+func segna_scelte(lista: Array) -> void:
+	if _mappa_scelte != null:
+		_mappa_scelte.queue_free()
+		_mappa_scelte = null
+	if pista == null or lista.is_empty():
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rr: float = clamp(pista.largo_cella * SCALA * 0.26, 0.035, 0.09) * 2.1
+	for k in lista.size():
+		var cid: String = lista[k]
+		if not pista.per_id.has(cid):
+			continue
+		var p := pos_casella(cid) + Vector3(0, 0.05, 0)
+		var col := Color(1, 0.9, 0.1) if k == 0 else Color(0.3, 1, 1)
+		var n := 24
+		for j in n:
+			var t0 := TAU * j / n
+			var t1 := TAU * (j + 1) / n
+			var a0 := Vector3(cos(t0), 0, sin(t0))
+			var a1 := Vector3(cos(t1), 0, sin(t1))
+			_triangolo(st, p + a0 * rr, p + a1 * rr, p + a1 * rr * 0.8, col)
+			_triangolo(st, p + a0 * rr, p + a1 * rr * 0.8, p + a0 * rr * 0.8, col)
+	_mappa_scelte = MeshInstance3D.new()
+	_mappa_scelte.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.vertex_color_use_as_albedo = true
+	m.no_depth_test = true
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.render_priority = 7
+	_mappa_scelte.material_override = m
+	add_child(_mappa_scelte)
 
 func _quadratino(st: SurfaceTool, p: Vector3, r: float, col: Color) -> void:
 	_triangolo(st, p + Vector3(-r, 0, -r), p + Vector3(r, 0, -r), p + Vector3(r, 0, r), col)

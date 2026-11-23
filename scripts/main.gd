@@ -23,9 +23,7 @@ var auto_prova := false       # prove: la gara va avanti da sola
 var _via_con := 0             # prove: la stanza parte da sola quando sono entrati tanti giocatori
 var _coda_azioni: Array = []
 var _autoguida := false       # prove: l'ospite sceglie da solo
-var _editor := false
-var _editor_da := ""
-var _editor_a := ""
+var editor: EditorPiste
 
 func _ready() -> void:
 	rete = Rete.new()
@@ -46,11 +44,17 @@ func _ready() -> void:
 	menu.via.connect(_via)
 	menu.comando.connect(_comando)
 	menu.in_rete = rete.web
-	mondo.sopra_ui = func(p): return menu.visible or hud.sopra(p)
+	editor = EditorPiste.new()
+	editor.visible = false
+	strato.add_child(editor)
+	editor.rete = rete
+	editor.mondo = mondo
+	editor.esci.connect(_al_menu)
+	mondo.sopra_ui = func(p): return menu.visible or hud.sopra(p) or (editor.visible and editor.sopra(p))
 	mondo.casella_toccata.connect(_casella)
 	mondo.casella_mappa.connect(_casella_mappa)
 	var prima := Pista.carica("FDMonaco")
-	_applica_traiettorie_salvate(prima)
+	Modifiche.applica(rete, prima)
 	mondo.carica_pista(prima)
 	menu.ha_salvataggio = rete.carica("fd_gara") != ""
 	_carica_campionato()
@@ -135,27 +139,9 @@ func _comando(cosa: String) -> void:
 			mondo.mostra_mappa(acceso)
 			hud.b_mappa.text = "Caselle: sì" if acceso else "Caselle"
 			if acceso:
-				hud.cronaca("Mappatura delle caselle: bordo blu corsia di destra, verde centro, arancio sinistra; linee bianche avanti, rosse cambio corsia. Tocca una casella per vederne la sigla e dove porta.", "info")
-			else:
-				_chiudi_editor()
+				hud.cronaca("Mappatura delle caselle: pallino blu corsia di destra, verde centro, arancio sinistra, viola box; la punta indica il verso. Linee bianche avanti, rosse cambio corsia. Tocca una casella per vederne la sigla e dove porta.", "info")
 		"editor":
-			if _editor:
-				_chiudi_editor()
-			else:
-				_editor = true
-				_editor_da = ""
-				_editor_a = ""
-				if mondo.mappa == null:
-					mondo.mostra_mappa(true)
-					hud.b_mappa.text = "Caselle: sì"
-				hud.segna_editor(true)
-				hud.cronaca("EDITOR PISTA: tocca la casella di partenza, poi quella di arrivo. La freccia sarà bianca nella stessa corsia o rossa se cambia corsia.", "ordine")
-		"editor_add":
-			_aggiungi_traiettoria()
-		"editor_delete":
-			_elimina_traiettoria()
-		"editor_export":
-			_esporta_traiettorie()
+			_apri_editor()
 		"gira_sx":
 			mondo.gira(-PI / 6.0)
 		"gira_dx":
@@ -240,7 +226,8 @@ func _solo_velo() -> void:
 			c.visible = c != hud.p_dado
 
 func _al_menu() -> void:
-	_chiudi_editor()
+	if editor.visible:
+		editor.chiudi()
 	if modo == "stanza" or modo == "ospite":
 		rete.chiudi()
 	modo = "menu"
@@ -302,14 +289,13 @@ func _via(conf: Dictionary) -> void:
 		hud.campionato = camp
 	livello = int(conf.get("livello", 1))
 	modo = "stanza" if conf.get("stanza", false) else "locale"
-	_applica_traiettorie_salvate(Pista.carica(str(conf.pista)))
+	Modifiche.applica(rete, Pista.carica(str(conf.pista)))
 	motore = Motore.nuova(conf)
 	_apri_gara()
 	motore.avanza()
 	_ciclo()
 
 func _apri_gara() -> void:
-	_chiudi_editor()
 	menu.visible = false
 	hud.visible = true
 	hud.ospite = false
@@ -432,149 +418,20 @@ func _casella(cid: String) -> void:
 	hud.scegli_opzione(mondo.opzioni[cid])
 
 func _casella_mappa(cid: String) -> void:
+	if editor.visible:
+		return
 	var c = mondo.pista.per_id[cid]
-	if not _editor:
-		hud.cronaca("Casella %s (corsia %s): porta a %s" % [cid, ["box", "destra", "centro", "sinistra"][int(c.l)] if int(c.l) <= 3 else str(c.l),
-			", ".join(PackedStringArray(c.get("n", [])))], "info")
-		return
-	if _editor_da == "" or _editor_a != "":
-		_editor_da = cid
-		_editor_a = ""
-		mondo.anteprima_mappa(_editor_da)
-		hud.segna_editor(true, false)
-		hud.cronaca("Editor: partenza %s. Ora tocca la casella di arrivo." % cid, "info")
-	else:
-		_editor_a = cid
-		mondo.anteprima_mappa(_editor_da, _editor_a)
-		var stessa: bool = int(mondo.pista.per_id[_editor_da].l) == int(c.l)
-		var esiste: bool = Array(mondo.pista.per_id[_editor_da].get("n", [])).has(_editor_a)
-		var nuova: bool = _editor_da != _editor_a and not esiste
-		hud.segna_editor(true, nuova, esiste)
-		hud.cronaca("Editor: %s > %s (%s). Premi %s." % [_editor_da, _editor_a, "bianca" if stessa else "rossa", "Elimina" if esiste else "Aggiungi"], "ordine")
+	hud.cronaca("Casella %s (corsia %s): porta a %s" % [cid, ["box", "destra", "centro", "sinistra"][int(c.l)] if int(c.l) <= 3 else str(c.l),
+		", ".join(PackedStringArray(c.get("n", [])))], "info")
 
-func _chiudi_editor() -> void:
-	_editor = false
-	_editor_da = ""
-	_editor_a = ""
-	hud.segna_editor(false)
-	mondo.anteprima_mappa("")
-
-func _chiave_editor(pid: String) -> String:
-	return "fd_traiettorie_%s" % pid
-
-func _chiave_editor_rimosse(pid: String) -> String:
-	return "fd_traiettorie_rimosse_%s" % pid
-
-func _applica_traiettorie_salvate(p: Pista) -> void:
-	if p == null:
-		return
-	var testo := rete.carica(_chiave_editor(p.id))
-	if testo == "":
-		return
-	var lista = JSON.parse_string(testo)
-	if lista is Array:
-		for x in lista:
-			if x is Array and x.size() == 2:
-				p.aggiungi_collegamento(str(x[0]), str(x[1]))
-	var rimosse = JSON.parse_string(rete.carica(_chiave_editor_rimosse(p.id)))
-	if rimosse is Array:
-		for x in rimosse:
-			if x is Array and x.size() == 2:
-				p.elimina_collegamento(str(x[0]), str(x[1]))
-
-func _aggiungi_traiettoria() -> void:
-	if not _editor or _editor_da == "" or _editor_a == "":
-		return
-	var p := mondo.pista
-	if not p.aggiungi_collegamento(_editor_da, _editor_a):
-		hud.cronaca("La traiettoria %s > %s esiste già oppure non è valida." % [_editor_da, _editor_a], "avviso")
-		return
-	var coppia := [_editor_da, _editor_a]
-	var chiave_rimosse := _chiave_editor_rimosse(p.id)
-	var rimosse = JSON.parse_string(rete.carica(chiave_rimosse))
-	if not (rimosse is Array):
-		rimosse = []
-	var indice_rimosso: int = rimosse.find(coppia)
-	if indice_rimosso >= 0:
-		# Era una freccia originale eliminata: riaggiungerla annulla semplicemente l'eliminazione.
-		rimosse.remove_at(indice_rimosso)
-		rete.salva(chiave_rimosse, JSON.stringify(rimosse) if not rimosse.is_empty() else "")
-	else:
-		var chiave := _chiave_editor(p.id)
-		var lista = JSON.parse_string(rete.carica(chiave))
-		if not (lista is Array):
-			lista = []
-		if not lista.has(coppia):
-			lista.append(coppia)
-		rete.salva(chiave, JSON.stringify(lista))
-	hud.cronaca("Traiettoria %s > %s aggiunta per sempre a %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
-	_editor_da = ""
-	_editor_a = ""
-	mondo.mostra_mappa(true)
-	hud.segna_editor(true, false)
-
-func _elimina_traiettoria() -> void:
-	if not _editor or _editor_da == "" or _editor_a == "":
-		return
-	var p := mondo.pista
-	if not p.elimina_collegamento(_editor_da, _editor_a):
-		hud.cronaca("La traiettoria %s > %s non esiste." % [_editor_da, _editor_a], "avviso")
-		return
-	var coppia := [_editor_da, _editor_a]
-	# Se era stata aggiunta con l'editor, basta annullare l'aggiunta.
-	var chiave_aggiunte := _chiave_editor(p.id)
-	var aggiunte = JSON.parse_string(rete.carica(chiave_aggiunte))
-	if not (aggiunte is Array):
-		aggiunte = []
-	var indice: int = aggiunte.find(coppia)
-	if indice >= 0:
-		aggiunte.remove_at(indice)
-		rete.salva(chiave_aggiunte, JSON.stringify(aggiunte) if not aggiunte.is_empty() else "")
-	else:
-		var chiave_rimosse := _chiave_editor_rimosse(p.id)
-		var rimosse = JSON.parse_string(rete.carica(chiave_rimosse))
-		if not (rimosse is Array):
-			rimosse = []
-		if not rimosse.has(coppia):
-			rimosse.append(coppia)
-		rete.salva(chiave_rimosse, JSON.stringify(rimosse))
-	hud.cronaca("Traiettoria %s > %s eliminata e salvata per %s su questo dispositivo." % [_editor_da, _editor_a, p.nome], "ordine")
-	_editor_da = ""
-	_editor_a = ""
-	mondo.mostra_mappa(true)
-	hud.segna_editor(true)
-
-func _esporta_traiettorie() -> void:
-	var piste := {}
-	var totale := 0
-	for pid in Dati.PISTE:
-		var modifiche := {"aggiunte": [], "eliminazioni": []}
-		var aggiunte = JSON.parse_string(rete.carica(_chiave_editor(pid)))
-		if aggiunte is Array:
-			for x in aggiunte:
-				if x is Array and x.size() == 2:
-					modifiche.aggiunte.append({"da": str(x[0]), "a": str(x[1])})
-		var eliminazioni = JSON.parse_string(rete.carica(_chiave_editor_rimosse(pid)))
-		if eliminazioni is Array:
-			for x in eliminazioni:
-				if x is Array and x.size() == 2:
-					modifiche.eliminazioni.append({"da": str(x[0]), "a": str(x[1])})
-		var numero: int = modifiche.aggiunte.size() + modifiche.eliminazioni.size()
-		if numero > 0:
-			piste[pid] = modifiche
-			totale += numero
-	if totale == 0:
-		hud.cronaca("Non ci sono ancora traiettorie aggiunte da esportare.", "avviso")
-		return
-	var dati := {
-		"formato": "FormulaD-traiettorie",
-		"versione": 2,
-		"creato": Time.get_datetime_string_from_system(true),
-		"piste": piste,
-	}
-	var nome := "FormulaD-traiettorie-%s.json" % Time.get_date_string_from_system()
-	var destinazione := rete.scarica(nome, JSON.stringify(dati, "  "))
-	hud.cronaca("Esportate %d traiettorie di %d piste%s" % [totale, piste.size(), " in " + destinazione if destinazione != "" else "."], "ordine")
+## L'editor delle piste, una schermata a parte.
+func _apri_editor() -> void:
+	modo = "editor"
+	menu.visible = false
+	hud.visible = false
+	hud.chiudi_velo()
+	mondo.togli_opzioni()
+	editor.apri(mondo.pista.id if mondo.pista != null else "FDMonaco")
 
 ## Mostra uno alla volta gli eventi del motore.
 func _mostra(ev: Array) -> void:

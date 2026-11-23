@@ -97,6 +97,73 @@ func pos(cid: String) -> Vector2:
 	var c = per_id.get(cid)
 	return Vector2(c.p[0], c.p[1]) if c else Vector2.ZERO
 
+## Rilegge il circuito dal file, senza le modifiche fatte con l'editor.
+static func ricarica(pid: String) -> Pista:
+	_caricate.erase(pid)
+	return carica(pid)
+
+# ------------------------------------------------------------------ modifiche dell'editor
+
+func sposta_casella(cid: String, p: Vector2) -> void:
+	if per_id.has(cid):
+		per_id[cid].p = [snappedf(p.x, 0.1), snappedf(p.y, 0.1)]
+		_ricalcola()
+
+func ruota_casella(cid: String, r: float) -> void:
+	if per_id.has(cid):
+		per_id[cid].r = snappedf(fposmod(r, 360.0), 0.1)
+
+func corsia_casella(cid: String, l: int) -> void:
+	if per_id.has(cid):
+		per_id[cid].l = l
+		per_id[cid].pit = l == 0
+		_ricalcola()
+
+## Una casella nuova (senza collegamenti: si aggiungono con l'editor).
+func nuova_casella(cid: String, p: Vector2, r: float, l: int, curva: int) -> bool:
+	if per_id.has(cid):
+		return false
+	var c := {"id": cid, "p": [snappedf(p.x, 0.1), snappedf(p.y, 0.1)], "r": snappedf(fposmod(r, 360.0), 0.1), "l": l,
+		"s": "x", "n": [], "c": curva, "pit": l == 0, "box": ""}
+	caselle.append(c)
+	per_id[cid] = c
+	# accanto: le caselle vicine delle altre corsie (per contatti e sorpassi)
+	var acc: Array = []
+	for o in caselle:
+		if o.id != cid and o.pit == c.pit and pos(o.id).distance_to(p) < max(cella, largo_cella) * 1.5:
+			acc.append(o.id)
+			if not vicini.has(o.id):
+				vicini[o.id] = []
+			if not vicini[o.id].has(cid):
+				vicini[o.id].append(cid)
+	vicini[cid] = acc
+	_ricalcola()
+	return true
+
+## Toglie una casella con tutti i collegamenti verso di lei.
+func togli_casella(cid: String) -> bool:
+	if not per_id.has(cid):
+		return false
+	caselle.erase(per_id[cid])
+	per_id.erase(cid)
+	for c in caselle:
+		if c.n.has(cid):
+			c.n.erase(cid)
+	vicini.erase(cid)
+	for k in vicini:
+		if vicini[k].has(cid):
+			vicini[k].erase(cid)
+	_ricalcola()
+	return true
+
+func _ricalcola() -> void:
+	_cache_avanti.clear()
+	dimensione_curva.clear()
+	for c in caselle:
+		if int(c.c) > 0:
+			dimensione_curva[int(c.c)] = int(dimensione_curva.get(int(c.c), 0)) + 1
+	_posizioni()
+
 ## Aggiunge una traiettoria all'edizione locale della pista. Ritorna false se non è valida o esiste già.
 func aggiungi_collegamento(da: String, a: String) -> bool:
 	if da == a or not per_id.has(da) or not per_id.has(a):

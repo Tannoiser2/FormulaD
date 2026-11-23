@@ -82,35 +82,68 @@ func _titolo(vb: VBoxContainer, sotto: String) -> void:
 
 func principale() -> void:
 	var vb := _nuovo_corpo()
-	_titolo(vb, "Motori, marce e dadi: la corsa da tavolo in versione digitale")
-	vb.add_child(UI.spazio(0, 10))
+	var t := UI.testo("FORMULA D", 92, UI.ROSSO, true)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t.add_theme_color_override("font_outline_color", Color.WHITE)
+	t.add_theme_constant_override("outline_size", 8)
+	vb.add_child(t)
+	var griglia := GridContainer.new()
+	griglia.columns = 3
+	griglia.add_theme_constant_override("h_separation", 22)
+	griglia.add_theme_constant_override("v_separation", 14)
+	vb.add_child(griglia)
 	var voci := [
-		["GARA SU QUESTO SCHERMO", "Da soli contro il computer, o in più a turno sullo stesso schermo", "locale", UI.ROSSO],
-		["TV + TELEFONI", "Il tabellone su questo schermo, ogni pilota sceglie dal suo telefono (QR code)", "stanza_tv", Color(0.75, 0.42, 0.05)],
-		["GARA ONLINE", "Ognuno gioca dal suo computer e vede la stessa gara: apri la gara e dai il codice", "stanza_online", Color(0.15, 0.35, 0.6)],
-		["ENTRA IN UNA GARA ONLINE", "Gioca da questo computer in una gara online aperta da un altro", "entra", Color(0.12, 0.45, 0.5)],
+		["locale", "Da soli contro il computer, o in più a turno sullo stesso schermo"],
+		["campionato", "Più Gran Premi con qualifiche, punti, scuderie e Punti Pilota"],
+		["stanza_tv", "Il tabellone qui, ogni pilota sceglie dal suo telefono (QR code)"],
+		["stanza_online", "Ognuno gioca dal suo computer: apri la gara e dai il codice"],
+		["editor", "Scegli un circuito e correggi caselle e traiettorie"],
+		["regole", "Il regolamento in breve, in italiano"],
 	]
-	voci.insert(1, ["CAMPIONATO", "Più Gran Premi di fila con qualifiche, punti, scuderie e Punti Pilota", "campionato", Color(0.55, 0.12, 0.45)])
-	if camp_salvato != "":
-		voci.insert(2, ["CONTINUA IL CAMPIONATO", camp_salvato, "camp_continua", Color(0.45, 0.1, 0.38)])
-	if ha_salvataggio:
-		voci.append(["RIPRENDI LA GARA SALVATA", "Continua dall'ultimo turno", "riprendi", Color(0.1, 0.55, 0.2)])
-	voci.append(["REGOLE", "Il regolamento in breve, in italiano", "regole", UI.FONDO2])
 	for vo in voci:
-		var voce := UI.colonna(2)
-		vb.add_child(voce)
-		var b := UI.bottone(vo[0], 32, vo[3], 760, 54)
-		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		var cosa: String = vo[2]
+		griglia.add_child(_riquadro_menu(vo[0], vo[1]))
+	var altri := UI.riga(16)
+	altri.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(altri)
+	var sec := [["ENTRA IN UNA GARA ONLINE", "entra", Color(0.12, 0.45, 0.5)]]
+	if camp_salvato != "":
+		sec.append(["CONTINUA IL CAMPIONATO", "camp_continua", Color(0.45, 0.1, 0.38)])
+	if ha_salvataggio:
+		sec.append(["RIPRENDI LA GARA SALVATA", "riprendi", Color(0.1, 0.55, 0.2)])
+	for x in sec:
+		var b := UI.bottone(x[0], 24, x[2], 380, 50)
+		var cosa: String = x[1]
 		b.pressed.connect(func(): _voce(cosa))
-		voce.add_child(b)
-		var d := UI.testo(vo[1], 20, UI.GRIGIO)
-		d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		voce.add_child(d)
+		altri.add_child(b)
+	if camp_salvato != "":
+		var c := UI.testo("Campionato in corso: " + camp_salvato, 20, UI.GRIGIO)
+		c.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vb.add_child(c)
 	if avviso != "":
 		var a := UI.testo(avviso, 24, UI.GIALLO, false, 900)
 		a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vb.add_child(a)
+
+## Un riquadro del menu: l'immagine (che porta già il titolo) e sotto una riga di spiegazione.
+func _riquadro_menu(cosa: String, desc: String) -> Control:
+	var col := UI.colonna(4)
+	col.custom_minimum_size = Vector2(580, 0)
+	var b := TextureButton.new()
+	b.texture_normal = load("res://assets/img/menu/%s.webp" % cosa)
+	b.ignore_texture_size = true
+	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	b.custom_minimum_size = Vector2(580, 256)
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.mouse_entered.connect(func(): b.modulate = Color(1.15, 1.15, 1.15))
+	b.mouse_exited.connect(func(): b.modulate = Color.WHITE)
+	b.button_down.connect(func(): b.modulate = Color(0.8, 0.8, 0.8))
+	b.button_up.connect(func(): b.modulate = Color.WHITE)
+	b.pressed.connect(func(): _voce(cosa))
+	col.add_child(b)
+	var d := UI.testo(desc, 20, UI.GRIGIO, false, 580)
+	d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(d)
+	return col
 
 func _voce(cosa: String) -> void:
 	avviso = ""

@@ -24,10 +24,6 @@ var dado_box: HBoxContainer
 var p_sx: PanelContainer
 var col_dx: VBoxContainer
 var b_mappa: Button
-var b_editor: Button
-var b_editor_add: Button
-var b_editor_delete: Button
-var b_editor_export: Button
 var b_cronaca: Button
 var b_scritte: Button
 var titolo_ordine: Label
@@ -57,16 +53,6 @@ func segna_segui(si: bool) -> void:
 	b_segui.text = "Telecamera: segue" if si else "Telecamera: ferma"
 	b_segui.modulate = Color.WHITE if si else Color(1.0, 0.85, 0.3)
 
-## Stato dei comandi dell'editor delle traiettorie nella barra superiore.
-func segna_editor(attivo: bool, aggiungibile := false, eliminabile := false) -> void:
-	b_editor.text = "Editor: sì" if attivo else "Editor"
-	b_editor.modulate = Color(1.0, 0.85, 0.3) if attivo else Color.WHITE
-	b_editor_add.visible = attivo
-	b_editor_add.disabled = not aggiungibile
-	b_editor_delete.visible = attivo
-	b_editor_delete.disabled = not eliminabile
-	b_editor_export.visible = attivo
-
 func _ready() -> void:
 	UI.prepara()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -87,26 +73,12 @@ func _ready() -> void:
 	barra_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	barra_info.clip_text = true
 	hb.add_child(barra_info)
-	for b in [["Telecamera: segue", "segui"], ["Vista intera", "vista"], ["Caselle", "mappa"], ["Editor", "editor"], ["Aggiungi", "editor_add"], ["Elimina", "editor_delete"], ["Esporta JSON", "editor_export"], ["Scritte: icone", "scritte"], ["Regole", "regole"], ["Menu", "menu"]]:
+	for b in [["Telecamera: segue", "segui"], ["Vista intera", "vista"], ["Caselle", "mappa"], ["Scritte: icone", "scritte"], ["Regole", "regole"], ["Menu", "menu"]]:
 		var bt := UI.bottone(b[0], 22, UI.FONDO2, 96, 44)
 		bt.pressed.connect(func(): comando.emit(b[1]))
 		hb.add_child(bt)
 		if b[1] == "mappa":
 			b_mappa = bt
-		if b[1] == "editor":
-			b_editor = bt
-		if b[1] == "editor_add":
-			b_editor_add = bt
-			bt.visible = false
-			bt.disabled = true
-		if b[1] == "editor_delete":
-			b_editor_delete = bt
-			bt.visible = false
-			bt.disabled = true
-		if b[1] == "editor_export":
-			b_editor_export = bt
-			bt.visible = false
-			bt.custom_minimum_size.x = 135
 		if b[1] == "scritte":
 			b_scritte = bt
 		if b[1] == "segui":
