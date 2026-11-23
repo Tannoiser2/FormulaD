@@ -44,6 +44,16 @@ func _ready() -> void:
 	menu.via.connect(_via)
 	menu.comando.connect(_comando)
 	menu.in_rete = rete.web
+	var nomi = JSON.parse_string(rete.carica("fd_nomi")) if rete.carica("fd_nomi") != "" else null
+	if nomi is Array:
+		menu.nomi = nomi
+	menu.nome_ospite = rete.carica("fd_nome")
+	menu.entra_gara.connect(func(c: String, n: String):
+		if not rete.web:
+			menu.avviso = "Per entrare in una gara online apri la versione web del gioco."
+			menu.online()
+			return
+		_entra(c, n))
 	editor = EditorPiste.new()
 	editor.visible = false
 	strato.add_child(editor)
@@ -210,6 +220,8 @@ func _comando(cosa: String) -> void:
 			_pubblica_attesa()
 		"entra":
 			_chiedi_codice()
+		"nomi":
+			rete.salva("fd_nomi", JSON.stringify(menu.nomi))
 		"riprendi":
 			_riprendi()
 
@@ -226,6 +238,7 @@ func _solo_velo() -> void:
 			c.visible = c != hud.p_dado
 
 func _al_menu() -> void:
+	hud.nascondi_qr()
 	if editor.visible:
 		editor.chiudi()
 	if modo == "stanza" or modo == "ospite":
@@ -298,6 +311,7 @@ func _via(conf: Dictionary) -> void:
 func _apri_gara() -> void:
 	menu.visible = false
 	hud.visible = true
+	_qr_in_gara()
 	hud.ospite = false
 	hud.chiudi_velo()
 	hud.pulisci_dadi()
@@ -560,6 +574,13 @@ func _pubblica_attesa() -> void:
 	if rete.codice != "" and modo == "menu" and menu.stanza:
 		rete.stato(menu.vista_attesa())
 
+## Con i telefoni il QR resta in un angolo per tutta la gara: chi perde la connessione lo inquadra e rientra.
+func _qr_in_gara() -> void:
+	if modo == "stanza" and menu.tipo_stanza == "tv" and rete.codice != "" and rete.url != "":
+		hud.mostra_qr(_qr(rete.url), rete.codice)
+	else:
+		hud.nascondi_qr()
+
 func _qr(testo: String) -> Texture2D:
 	var s := rete.qr(testo)
 	var n := int(round(sqrt(s.length())))
@@ -579,6 +600,7 @@ func _evento_rete(e: Dictionary) -> void:
 			menu.imposta_stanza(rete.codice, rete.url, _qr(rete.url))
 			if modo == "stanza" and motore != null:
 				hud.cronaca("Stanza aperta: codice %s" % rete.codice, "ordine")
+				_qr_in_gara()
 				_pubblica(motore.vista(), [])
 			else:
 				_pubblica_attesa()

@@ -114,6 +114,15 @@ const PISTE := ["FDMonaco", "FDHockenheim", "FDSebring", "FDValencia", "FDSingap
 static func zone(regole: String) -> Array:
 	return ZONE[regole]
 
+## Il nome breve per etichette e dadi: il nome proprio («Jack»), ma «Pilota 3» resta intero.
+static func corto(nome: String) -> String:
+	var p := nome.strip_edges().split(" ", false)
+	if p.is_empty():
+		return nome
+	if p.size() > 1 and (p[1].is_valid_int() or p[0].length() <= 2):
+		return p[0] + " " + p[1]
+	return p[0]
+
 static func colore_auto(pilota: int) -> Color:
 	var p: Dictionary = PILOTI[pilota]
 	var c: Color = SCUDERIE[p.scuderia].colore
@@ -140,60 +149,3 @@ static func testo_usura(regole: String, usura: Dictionary) -> String:
 			parti.append("%d %s" % [n, z.breve])
 	return ", ".join(parti)
 
-const REGOLE_IN_BREVE := """[b]Scopo[/b] - Tagliare per primi il traguardo dopo i giri stabiliti.
-
-[b]Il turno[/b] - Gioca per prima l'auto in testa, poi le altre in ordine di posizione. A parità, prima la marcia più alta, poi chi è più all'interno della curva. Al tuo turno scegli la marcia e tiri il dado di quella marcia: l'auto avanza di tante caselle quante ne indica il dado.
-
-[b]Marce[/b] - 1a: 1-2, 2a: 2-4, 3a: 4-8, 4a: 7-12, 5a: 11-20, 6a: 21-30. Si sale di una marcia alla volta. Si scala di una marcia gratis; scalando di più si saltano marce e l'auto si rovina (fino a 3 marce saltate).
-
-[b]Rettilinei[/b] - Si può cambiare corsia ma non zigzagare: si va sempre per la via più breve. Non si passa attraverso le altre auto.
-
-[b]Curve[/b] - Ogni curva ha un numero di fermate obbligatorie (il numero giallo sul tabellone): bisogna finire il movimento dentro la curva almeno quelle volte. Chi esce prima va «lungo»: paga 1 punto per ogni casella oltre la curva e non può cambiare corsia. Se mancano due o più fermate l'auto è eliminata.
-
-[b]Frenare[/b] - Si può avanzare meno del tiro, pagando 1 punto per ogni casella non percorsa.
-
-[b]Partenza[/b] - Dado nero: con 1 l'auto resta ferma (motore spento) e parte al turno dopo; con il risultato più alto fa una partenza lampo di 4 caselle; altrimenti parte in 1a.
-
-[b]Motore sotto sforzo[/b] - Se esce 20 in 5a o 30 in 6a, tutte le auto in 5a o 6a tirano il dado nero: da 1 a 4 perdono 1 punto.
-
-[b]Collisioni[/b] - Chi finisce il movimento accanto o dietro a un'altra auto tira il dado nero (e così l'auto toccata).
-
-[b]Box[/b] - Nelle gare di più giri, tra un giro e l'altro si può entrare nella corsia dei box e fermarsi nel proprio box: si riparte al massimo in 4a. In corsia box non valgono frenate, scalate, collisioni e sforzo del motore.
-
-[b]Regole base[/b] - Un'unica riserva di 18 Punti Struttura (PS) per tutto. Collisione: da 1 a 4 si perde 1 PS. Partenza lampo con 17-20. Al box si recuperano tutti i PS. A 0 PS l'auto è eliminata.
-
-[b]Regole avanzate[/b] - Sei zone: Gomme 6, Freni 3, Cambio 3, Carrozzeria 3, Motore 3, Tenuta di strada 2.
-- Andare lungo: 1 Gomme per casella. Se si perde l'ultimo punto Gomme l'auto va in testacoda (riparte in 1a); se servono più Gomme di quante ne restano è eliminata.
-- Frenare: 1 Freni per casella fino a 3, dalla quarta casella anche 1 Gomme per casella; 7 caselle o più: eliminata. Senza Freni si consumano le Gomme.
-- Scalare saltando 1 marcia: 1 Cambio; 2 marce: 1 Cambio e 1 Freni; 3 marce: 1 Cambio, 1 Freni e 1 Motore. Senza Cambio si scala di una marcia alla volta.
-- Collisione: con 1 si perde 1 Carrozzeria. Motore sotto sforzo: da 1 a 4 si perde 1 Motore.
-- Detriti: ogni punto Carrozzeria o Motore perso (e ogni auto eliminata) lascia un segnalino sulla casella. Chi ci passa sopra tira il dado nero: da 1 a 4 perde 1 Tenuta di strada.
-- Scia: chi finisce tutto il tiro esattamente dietro un'auto, entrambe in 4a o più e chi segue con marcia uguale o più alta, può avanzare di altre 3 caselle. Se la scia porta dentro una curva costa 1 Freni.
-- Box: si recuperano tutte le Gomme. Dado nero: da 1 a 10 sosta rapida, si riparte subito in 4a per metà del tiro (arrotondata per eccesso); da 11 a 20 si aspetta il turno dopo.
-- A 0 di Carrozzeria, Motore o Tenuta di strada l'auto è eliminata.
-
-[b]Assetto libero[/b] (regole avanzate) - Prima del via ognuno ripartisce 20 punti fra le sei zone: Gomme da 1 a 14, le altre da 1 a 7.
-
-[b]Meteo e gomme[/b] (regole avanzate) - Prima del via il dado nero decide il tempo: da 1 a 7 pioggia, da 8 a 12 variabile, da 13 a 20 bel tempo. Con il tempo variabile, ogni volta che esce 20 in 5a o 30 in 6a si ritira: bel tempo fa migliorare, pioggia fa peggiorare.
-- Sotto la pioggia: collisione con 1 o 2, motore sotto sforzo da 1 a 3, detriti da 1 a 5.
-- Gomme dure: con la pioggia, quando la mossa tocca una curva, si avanza di 3 caselle in più.
-- Gomme morbide: all'asciutto si può avanzare di 1 casella in più, ma andare lungo costa il doppio delle Gomme. Dopo un giro senza cambiarle il vantaggio sparisce, dopo due giri andare lungo costa il triplo. Con la pioggia, +3 in curva.
-- Gomme da pioggia: con la pioggia +1 casella quando la mossa tocca una curva; all'asciutto andare lungo costa il doppio (il triplo dopo due giri).
-- Al box si possono cambiare le gomme.
-
-[b]Qualifiche a settori[/b] (facoltative; sempre nel campionato) - Il giro ha 3 settori, ognuno con un limite (32 meno 3 per ogni fermata delle sue curve, fra 12 e 26). In ogni settore si sceglie una marcia dalla 3a alla 6a e si tira: entro il limite si fanno i punti del dado, oltre di 1-4 il limite meno 2 per ogni casella in più, oltre di 5 o più testacoda (0). Vince il giro con più punti; a parità chi ha fatto di più nel 3° settore, poi il dado nero. Con 8 auto o più: Q1 (escono gli ultimi), Q2 (fino a 7), Q3 (4 auto, si gira dall'ultimo al primo). Un settore si può riprovare: con le regole base una volta per sessione, con le avanzate ogni nuovo tiro costa 1 Gomme per la gara (al massimo 2); con le avanzate anche un testacoda costa 1 Gomme.
-
-[b]Campionato[/b] (regolamento di Gianluca Lari) - Più Gran Premi di fila con le qualifiche. Punti 8-6-4-2-1 ai primi cinque arrivati; classifica scuderie (i due piloti dello stesso colore); premio Gilles Villeneuve per chi guadagna più posizioni dalla griglia all'arrivo (chi non arriva conta ultimo). Ogni pilota ha 1 Punto Pilota per gara, che permette di ritirare il dado della marcia; i primi tre di ogni GP ne guadagnano uno in più per le gare seguenti (al massimo 4, si spendono prima quelli guadagnati).
-
-[b]Gara su strada[/b] - Niente box. Una volta per giro, dopo il tiro, si può usare il Nitro: si avanza di tante caselle in più quante il numero della marcia, e vanno fatte tutte. Al traguardo (punto di controllo), con le regole base si recuperano 10 PS fino a 18; con le avanzate si recuperano tutte le Gomme e 2 punti nelle zone più rovinate.
-Con le regole avanzate ogni pilota guida la sua auto, solo con gomme dure, e ha un'abilità:
-- Li Tsu Sin: chi taglia il traguardo mentre lei è in gara avanza di una casella in meno.
-- Jack Owens: in curva può allungare o accorciare la mossa di 1 casella, pagando 1 Gomme.
-- Julien Marcellin: ritira il dado del meteo quando dice pioggia; sotto la pioggia in curva scivola di 1 invece di 3.
-- Jenny Slivers: al traguardo recupera 4 punti invece di 2.
-- Derek Manson: chi collide con lui tira il dado nero due volte.
-- Diane Montfort: a parità di posizione muove sempre per prima.
-- Stanley Washington: una volta per gara lancia la radio contro un'auto accanto (il dado nero dice quale zona perde 1 punto).
-- Temana Matahi: una volta per giro lascia detriti dove parte; sui detriti perde Tenuta solo con 1 o 2.
-- Dimitri Tzarof: motore sotto sforzo solo con 1-3 (1-2 se piove).
-- Montoya Cadena: con il Nitro può avanzare di 3 caselle in più."""

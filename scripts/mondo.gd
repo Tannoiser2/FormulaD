@@ -184,7 +184,7 @@ func metti_auto(i: int, pilota: int, nome: String, cid: String) -> void:
 		mi.name = "modello"
 		n.add_child(mi)
 		var l := Label3D.new()
-		l.text = nome.split(" ")[0]
+		l.text = Dati.corto(nome)
 		l.font = font
 		l.font_size = 40
 		l.pixel_size = 0.0035

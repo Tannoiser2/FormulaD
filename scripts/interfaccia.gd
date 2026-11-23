@@ -188,6 +188,51 @@ func _ready() -> void:
 	_pannelli = [barra, p_ass, p_sx, p_cron, p_azione, p_plancia, p_dado]
 
 ## Vero se il punto è sopra un pannello: lì i tocchi non devono muovere il tabellone.
+## Il QR code della stanza TV + telefoni in basso a sinistra, per rientrare se un telefono perde la gara.
+var p_qr: PanelContainer
+var _qr_img: TextureRect
+func mostra_qr(tex: Texture2D, codice: String) -> void:
+	if p_qr == null:
+		p_qr = UI.pannello(UI.FONDO, UI.FONDO2, 10, 2, 8)
+		p_qr.anchor_top = 1
+		p_qr.anchor_bottom = 1
+		p_qr.offset_left = 10
+		p_qr.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		p_qr.offset_bottom = -10
+		add_child(p_qr)
+		_pannelli.append(p_qr)
+		var vb := UI.colonna(4)
+		p_qr.add_child(vb)
+		_qr_img = TextureRect.new()
+		_qr_img.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_qr_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_qr_img.custom_minimum_size = Vector2(150, 150)
+		_qr_img.mouse_filter = Control.MOUSE_FILTER_STOP
+		_qr_img.gui_input.connect(func(e):
+			if (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed):
+				var grande := _qr_img.custom_minimum_size.x < 200
+				_qr_img.custom_minimum_size = Vector2(420, 420) if grande else Vector2(150, 150)
+				_posa_qr())
+		vb.add_child(_qr_img)
+		var l := UI.testo("", 18, UI.GRIGIO, false, 150)
+		l.name = "testo"
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vb.add_child(l)
+	_qr_img.texture = tex
+	(p_qr.find_child("testo", true, false) as Label).text = "Stanza %s\nper rientrare" % codice
+	p_qr.visible = tex != null
+	_posa_qr()
+
+func _posa_qr() -> void:
+	p_qr.reset_size()
+	var alto := p_qr.get_combined_minimum_size().y
+	p_qr.offset_top = -alto - 10
+	p_qr.offset_bottom = -10
+
+func nascondi_qr() -> void:
+	if p_qr != null:
+		p_qr.visible = false
+
 func sopra(p: Vector2) -> bool:
 	if velo != null and is_instance_valid(velo):
 		return true
@@ -377,7 +422,7 @@ func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 
 	var d3 := Dado3D.new(90)
 	dado_box.add_child(d3)
 	await d3.mostra(marcia, faccia, durata)
-	dado_box.add_child(_faccia(str(valore), Dati.COLORI_MARCE[marcia], marcia == 1, "%s in %s" % [nome.split(" ")[0], Dati.NOMI_MARCE[marcia]]))
+	dado_box.add_child(_faccia(str(valore), Dati.COLORI_MARCE[marcia], marcia == 1, "%s in %s" % [Dati.corto(nome), Dati.NOMI_MARCE[marcia]]))
 
 func mostra_nero(valore: int, motivo: String, male: bool) -> void:
 	if dado_box.get_child_count() > 4:
@@ -644,22 +689,65 @@ func _apri_velo(titolo: String, larg := 1100.0) -> VBoxContainer:
 	vb.add_child(t)
 	return vb
 
-func mostra_regole() -> void:
-	var vb := _apri_velo("REGOLE IN BREVE", 1300)
-	var r := RichTextLabel.new()
-	r.bbcode_enabled = true
-	r.text = Dati.REGOLE_IN_BREVE
-	r.custom_minimum_size = Vector2(1250, 700)
-	r.add_theme_font_override("normal_font", UI.f_medio)
-	r.add_theme_font_override("bold_font", UI.f_testo)
-	r.add_theme_font_size_override("normal_font_size", 25)
-	r.add_theme_font_size_override("bold_font_size", 26)
-	r.add_theme_color_override("default_color", UI.CHIARO)
-	vb.add_child(r)
+var _regole_capitolo := 0
+var _regole_testo: RichTextLabel
+var _regole_indice: Array = []
+var _regole_prima: Button
+var _regole_dopo: Button
+func mostra_regole(capitolo := -1) -> void:
+	if capitolo >= 0:
+		_regole_capitolo = capitolo
+	var vb := _apri_velo("REGOLE", 1500)
+	var h := UI.riga(18)
+	vb.add_child(h)
+	# indice dei capitoli
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.custom_minimum_size = Vector2(330, 730)
+	h.add_child(sc)
+	var ind := UI.colonna(4)
+	ind.custom_minimum_size.x = 310
+	sc.add_child(ind)
+	_regole_indice = []
+	for k in Regolamento.CAPITOLI.size():
+		var b := UI.bottone(Regolamento.CAPITOLI[k][0], 21, UI.FONDO2, 310, 38)
+		var kk := k
+		b.pressed.connect(func(): _capitolo(kk))
+		ind.add_child(b)
+		_regole_indice.append(b)
+	_regole_testo = RichTextLabel.new()
+	_regole_testo.bbcode_enabled = true
+	_regole_testo.custom_minimum_size = Vector2(1100, 730)
+	_regole_testo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_regole_testo.add_theme_font_override("normal_font", UI.f_medio)
+	_regole_testo.add_theme_font_override("bold_font", UI.f_testo)
+	_regole_testo.add_theme_font_size_override("normal_font_size", 25)
+	_regole_testo.add_theme_font_size_override("bold_font_size", 26)
+	_regole_testo.add_theme_color_override("default_color", UI.CHIARO)
+	h.add_child(_regole_testo)
+	var hb := UI.riga(16)
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(hb)
+	_regole_prima = UI.bottone("< Capitolo prima", 24, UI.FONDO2, 260, 54)
+	_regole_prima.pressed.connect(func(): _capitolo(_regole_capitolo - 1))
+	hb.add_child(_regole_prima)
 	var b := UI.bottone("Chiudi", 28, UI.ROSSO, 240, 54)
-	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(chiudi_velo)
-	vb.add_child(b)
+	hb.add_child(b)
+	_regole_dopo = UI.bottone("Capitolo dopo >", 24, UI.FONDO2, 260, 54)
+	_regole_dopo.pressed.connect(func(): _capitolo(_regole_capitolo + 1))
+	hb.add_child(_regole_dopo)
+	_capitolo(_regole_capitolo)
+
+## Cambia capitolo senza riaprire la finestra.
+func _capitolo(k: int) -> void:
+	_regole_capitolo = clampi(k, 0, Regolamento.CAPITOLI.size() - 1)
+	_regole_testo.text = "[font_size=34][b]%s[/b][/font_size]\n\n%s" % Regolamento.CAPITOLI[_regole_capitolo]
+	_regole_testo.scroll_to_line(0)
+	for i in _regole_indice.size():
+		UI.colora_bottone(_regole_indice[i], UI.ROSSO if i == _regole_capitolo else UI.FONDO2)
+	_regole_prima.disabled = _regole_capitolo == 0
+	_regole_dopo.disabled = _regole_capitolo >= Regolamento.CAPITOLI.size() - 1
 
 func mostra_menu(testi: Array) -> void:
 	var vb := _apri_velo("PAUSA", 620)
@@ -684,7 +772,7 @@ func mostra_fine() -> void:
 		var lp := UI.testo(pos, 34, UI.GIALLO if int(a.pa) == 1 else UI.CHIARO, true)
 		lp.custom_minimum_size.x = 80
 		h.add_child(lp)
-		h.add_child(UI.immagine("res://assets/piloti/%s.webp" % Dati.PILOTI[int(a.p)].id, Vector2(44, 62)))
+		h.add_child(UI.immagine("res://assets/piloti/%s%s.webp" % [Dati.PILOTI[int(a.p)].id, "_strada" if v.get("abil", false) else ""], Vector2(44, 62)))
 		h.add_child(UI.chip(Dati.colore_auto(int(a.p)), Vector2(16, 44)))
 		var ln := UI.testo(str(a.n), 32, UI.CHIARO if int(a.pa) > 0 else UI.GRIGIO)
 		ln.custom_minimum_size.x = 320
@@ -857,7 +945,7 @@ func _classifica_qualifiche() -> void:
 		var fuori := []
 		var base: int = v.auto.size() - q.griglia.size()
 		for k in q.griglia.size():
-			fuori.append("%d. %s" % [base + k + 1, str(v.auto[int(q.griglia[k])].n).split(" ")[0]])
+			fuori.append("%d. %s" % [base + k + 1, Dati.corto(str(v.auto[int(q.griglia[k])].n))])
 		lista.add_child(UI.testo("Già in griglia: " + ", ".join(PackedStringArray(fuori)), 18, UI.GRIGIO, false, LARG_DX - 30))
 
 # ------------------------------------------------------------------ campionato

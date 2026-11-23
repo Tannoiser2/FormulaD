@@ -149,7 +149,7 @@ async function entra() {
         const c = codice;
         codice = '';
         stato = null;
-        app.innerHTML = `<h1>FORMULA D</h1><div class="box"><p class="grande">Gara online ${esc(c)}</p><p class="sotto">Questa gara si gioca dal computer: apri il gioco sul computer e scegli «Entra in una gara online». Il telefono serve per le gare TV + telefoni.</p></div>`;
+        app.innerHTML = `<h1>FORMULA D</h1><div class="box"><p class="grande">Gara online ${esc(c)}</p><p class="sotto">Questa gara si gioca dal computer: apri il gioco sul computer e scegli «Gara online» e poi «Entra in una gara». Il telefono serve per le gare TV + telefoni.</p></div>`;
         return;
       }
       disegna();
@@ -393,7 +393,7 @@ function attesa() {
   let h = `<h1>FORMULA D</h1><div class="box mio"><p class="grande">Stanza ${esc(codice)}</p>`;
   if (mio) {
     h += `<div class="testa"><span class="col" style="background:${colore(mio.p)}"></span><div class="chi"><div class="nome">${esc(nome)}</div>
-      <div class="dati">Guidi l'auto di ${esc(NOMI_PILOTI[mio.p])}, scuderia ${PILOTI[mio.p][1]}. Aspetta il via!</div></div></div>`;
+      <div class="dati">${stato.abil ? `Guidi l'auto di ${esc(NOMI_PILOTI[mio.p])}, scuderia` : 'Guidi l\'auto della scuderia'} ${PILOTI[mio.p][1]}. Aspetta il via!</div></div></div>`;
   } else {
     h += `<p class="sotto">Sei dentro, ma non c'è ancora un posto libero per te: chiedi a chi organizza di aprirne uno («Telefono / online»).</p>`;
   }
@@ -401,7 +401,7 @@ function attesa() {
   for (const p of stato.posti || []) {
     if (p.tp === 'chiuso') continue;
     const chi = p.tp === 'ia' ? 'computer' : p.tp === 'umano' ? 'schermo grande' : (p.u ? esc(p.n) : 'posto libero');
-    h += `<div class="riga ${p.u === uid ? 'io' : ''}"><span class="col" style="background:${colore(p.p)}"></span><span class="n">${esc(NOMI_PILOTI[p.p])}</span><span class="p">${chi}</span></div>`;
+    h += `<div class="riga ${p.u === uid ? 'io' : ''}"><span class="col" style="background:${colore(p.p)}"></span><span class="n">${esc(p.nm || NOMI_PILOTI[p.p])}</span><span class="p">${chi}</span></div>`;
   }
   h += `</div>`;
   app.innerHTML = h;

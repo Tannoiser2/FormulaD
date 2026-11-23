@@ -73,6 +73,19 @@ static func bottone(t: String, dim := 28, col := ROSSO, larg := 0.0, alt := 0.0)
 	b.custom_minimum_size = Vector2(larg, alt)
 	return b
 
+## Cambia il colore di un bottone già fatto.
+static func colora_bottone(b: Button, col: Color) -> void:
+	for stato in ["normal", "hover", "pressed"]:
+		var c := col
+		if stato == "hover":
+			c = col.lightened(0.15)
+		elif stato == "pressed":
+			c = col.darkened(0.25)
+		var s := riquadro(c, c.lightened(0.35), 10, 2, 8)
+		s.content_margin_left = 16
+		s.content_margin_right = 16
+		b.add_theme_stylebox_override(stato, s)
+
 static func riga(sep := 8) -> HBoxContainer:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", sep)

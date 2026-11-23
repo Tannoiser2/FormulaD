@@ -21,7 +21,7 @@ func _init() -> void:
 			lista.append({"nome": Dati.PILOTI[i].nome, "pilota": i, "tipo": "umano" if (i == 0 and g % 2 == 1) else "ia"})
 		var opzioni := {}
 		if varianti != "":
-			opzioni = [{"qualifiche": true}, {"meteo": true, "libero": true, "qualifiche": true}, {"strada": true}, {"strada": true, "meteo": true}][g % 4]
+			opzioni = [{"qualifiche": true}, {"meteo": true, "libero": true, "qualifiche": true}, {"strada": true}, {"strada": true, "meteo": true}, {"nitro": true, "abilita": true, "meteo": true}][g % 5]
 		var m := Motore.nuova({"regole": regole, "pista": pid, "giri": 1 + g % 2 + (1 if varianti != "" and g % 3 == 0 else 0),
 			"auto": lista, "seme": 1000 + g, "opzioni": opzioni})
 		m.avanza()

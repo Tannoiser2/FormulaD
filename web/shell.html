@@ -34,8 +34,6 @@ $GODOT_HEAD_INCLUDE
 <div id="avvio">
   <h1>FORMULA D</h1>
   <div class="box">
-    <p>Motori, marce e dadi: 11 circuiti, regole base e avanzate.</p>
-    <button id="apri">ACCENDI I MOTORI</button>
     <p class="piccolo">Hai inquadrato un codice per giocare dal telefono? <a href="telefono.html">Apri il volante</a></p>
   </div>
   <div id="stato"></div>
@@ -66,7 +64,6 @@ let partito = false;
 async function parti() {
   if (partito) return;
   partito = true;
-  sbloccaAudio(); schermoAcceso();
   const missing = Engine.getMissingFeatures({ threads: false });
   if (missing.length) {
     stato.textContent = 'Questo browser non riesce ad aprire il gioco: ' + missing.join(', ');
@@ -85,8 +82,11 @@ async function parti() {
     stato.textContent = 'Errore: ' + (e?.message || e);
   }
 }
-document.getElementById('apri').addEventListener('click', parti);
-if (q.has('auto') || q.has('subito')) parti();
+// si parte subito; l'audio e lo schermo acceso si sbloccano al primo tocco
+const sblocca = () => { sbloccaAudio(); schermoAcceso(); };
+document.addEventListener('pointerdown', sblocca, { once: true, capture: true });
+document.addEventListener('keydown', sblocca, { once: true, capture: true });
+parti();
 </script>
 </body>
 </html>

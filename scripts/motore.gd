@@ -35,12 +35,13 @@ static func nuova(conf: Dictionary) -> Motore:
 	m.s = {"regole": regole, "pista": conf.pista, "giri": int(conf.get("giri", m.pista.giri)), "fase": "gara", "turno": 1,
 		"ordine": [], "auto": [], "danni": [], "arrivi": [], "attesa": null, "sforzo": false, "n_danni": 0,
 		"strada": strada, "libero": av and not strada and bool(op.get("libero", false)),
-		"meteo_on": av and bool(op.get("meteo", false)), "meteo": -1}
+		"meteo_on": av and bool(op.get("meteo", false)), "meteo": -1,
+		"abil": av and bool(op.get("abilita", strada)), "nitro": strada or bool(op.get("nitro", false))}
 	# griglia: ognuno tira il dado nero, il più alto parte in pole
 	var tiri := []
 	for i in conf.auto.size():
 		# Diane Montfort vince le parità in griglia
-		var diane: bool = strada and av and Dati.PILOTI[int(conf.auto[i].pilota)].id == "diane"
+		var diane: bool = m.s.abil and Dati.PILOTI[int(conf.auto[i].pilota)].id == "diane"
 		tiri.append([m.rng.randi_range(1, 20) * 100 + (99 if diane else m.rng.randi_range(0, 98)), i])
 	tiri.sort_custom(func(a, b): return a[0] > b[0])
 	var testo := []
@@ -148,7 +149,7 @@ func pioggia() -> bool:
 
 ## Le abilità dei piloti valgono nelle gare su strada con le regole avanzate.
 func abilita() -> bool:
-	return s.get("strada", false) and avanzate()
+	return s.get("abil", s.get("strada", false) and avanzate())
 
 func chi(a: Dictionary, id: String) -> bool:
 	return abilita() and Dati.PILOTI[int(a.pilota)].id == id
@@ -474,7 +475,7 @@ func _aggiunte(a: Dictionary) -> Array:
 		and int(a.get("eta", 0)) < 1
 	if morbide:
 		out.append({"v": 1, "ni": 0})
-	if s.get("strada", false) and int(a.get("nitro", -99)) != a.giro and a.marcia >= 1:
+	if s.get("nitro", s.get("strada", false)) and int(a.get("nitro", -99)) != a.giro and a.marcia >= 1:
 		var bonus := [int(a.marcia)]
 		if chi(a, "montoya"):
 			bonus.append(int(a.marcia) + 3)
@@ -1104,14 +1105,14 @@ func _arriva(a: Dictionary) -> void:
 func vista() -> Dictionary:
 	var v := {"regole": s.regole, "pista": s.pista, "giri": s.giri, "fase": s.fase, "turno": s.turno, "ordine": s.ordine,
 		"cl": classifica(), "danni": [], "auto": [], "att": null, "mt": int(s.get("meteo", -1)),
-		"str": s.get("strada", false), "lib": s.get("libero", false), "mon": s.get("meteo_on", false)}
+		"str": s.get("strada", false), "abil": abilita(), "lib": s.get("libero", false), "mon": s.get("meteo_on", false)}
 	for d in s.danni:
 		v.danni.append(d.c)
 	for a in s.auto:
 		v.auto.append({"n": a.nome, "p": a.pilota, "u": a.uid, "tp": a.tipo, "c": a.c, "m": a.marcia, "pf": a.pf, "g": a.giro,
 			"f": a.fuori, "pa": a.posto_arrivo, "t": a.testa, "d": a.dado, "mo": a.mosso == s.turno, "w": a.perche,
 			"dv": a.get("dove", ""), "gt": a.get("gomme_tipo", "dure"), "et": int(a.get("eta", 0)),
-			"ni": s.get("strada", false) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {}), "fs": _fermate_ora(a),
+			"ni": s.get("nitro", s.get("strada", false)) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {}), "fs": _fermate_ora(a),
 			"pp": int(a.get("pp", 0))})
 	if s.has("q"):
 		v["q"] = s.q

@@ -96,7 +96,7 @@ static func scuderie(c: Dictionary) -> Array:
 		tot[sc] = int(tot.get(sc, 0)) + int(c.punti.get(str(a.pilota), 0))
 		if not nomi.has(sc):
 			nomi[sc] = []
-		nomi[sc].append(str(a.nome).split(" ")[0])
+		nomi[sc].append(Dati.corto(str(a.nome)))
 	var l := []
 	for sc in tot:
 		l.append({"s": sc, "punti": tot[sc], "piloti": " e ".join(PackedStringArray(nomi[sc]))})

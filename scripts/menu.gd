@@ -5,6 +5,7 @@ extends Control
 
 signal via(conf: Dictionary)
 signal comando(cosa: String)
+signal entra_gara(codice: String, nome: String)
 
 const TIPI_LOCALE := ["umano", "ia", "chiuso"]
 const TIPI_STANZA := ["remoto", "ia", "umano", "chiuso"]
@@ -23,6 +24,9 @@ var strada := false
 var meteo := false
 var libero := false
 var qualifiche := false
+var abilita := false     # in circuito: i personaggi con le loro abilità (su strada ci sono sempre, con le regole avanzate)
+var nitro := false       # in circuito: il Nitro come su strada
+var nomi: Array = []     # i nomi scelti per i piloti (vuoto: «Pilota N»)
 var campionato := false
 var camp_piste: Array = []      # i circuiti scelti per il campionato, nell'ordine in cui si corrono
 var camp_salvato := ""          # riassunto del campionato in corso (vuoto se non ce n'è)
@@ -96,7 +100,7 @@ func principale() -> void:
 		["locale", "Da soli contro il computer, o in più a turno sullo stesso schermo"],
 		["campionato", "Più Gran Premi con qualifiche, punti, scuderie e Punti Pilota"],
 		["stanza_tv", "Il tabellone qui, ogni pilota sceglie dal suo telefono (QR code)"],
-		["stanza_online", "Ognuno gioca dal suo computer: apri la gara e dai il codice"],
+		["online", "Ognuno dal suo computer: apri una gara o entra con il codice"],
 		["editor", "Scegli un circuito e correggi caselle e traiettorie"],
 		["regole", "Il regolamento in breve, in italiano"],
 	]
@@ -105,7 +109,7 @@ func principale() -> void:
 	var altri := UI.riga(16)
 	altri.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(altri)
-	var sec := [["ENTRA IN UNA GARA ONLINE", "entra", Color(0.12, 0.45, 0.5)]]
+	var sec := []
 	if camp_salvato != "":
 		sec.append(["CONTINUA IL CAMPIONATO", "camp_continua", Color(0.45, 0.1, 0.38)])
 	if ha_salvataggio:
@@ -129,7 +133,7 @@ func _riquadro_menu(cosa: String, desc: String) -> Control:
 	var col := UI.colonna(4)
 	col.custom_minimum_size = Vector2(580, 0)
 	var b := TextureButton.new()
-	b.texture_normal = load("res://assets/img/menu/%s.webp" % cosa)
+	b.texture_normal = load("res://assets/img/menu/%s.webp" % ("stanza_online" if cosa == "online" else cosa))
 	b.ignore_texture_size = true
 	b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	b.custom_minimum_size = Vector2(580, 256)
@@ -163,6 +167,8 @@ func _voce(cosa: String) -> void:
 			preparazione()
 		"camp_continua":
 			comando.emit("camp_continua")
+		"online":
+			online()
 		"stanza", "stanza_tv", "stanza_online":
 			campionato = false
 			tipo_stanza = "online" if cosa == "stanza_online" else "tv"
@@ -177,6 +183,84 @@ func _voce(cosa: String) -> void:
 			comando.emit("apri_stanza")
 		_:
 			comando.emit(cosa)
+
+## Gara online: aprire una gara nuova o entrare in quella di un altro con il codice.
+var nome_ospite := ""
+func online() -> void:
+	var vb := _nuovo_corpo()
+	var t := UI.testo("GARA ONLINE", 64, UI.ROSSO, true)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(t)
+	var s := UI.testo("Ognuno gioca dal suo computer o tablet e vede la stessa gara.", 26, UI.CHIARO)
+	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(s)
+	var h := UI.riga(30)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(h)
+	# apri
+	var pa := UI.pannello(UI.FONDO, UI.ROSSO, 16, 3, 22)
+	pa.custom_minimum_size = Vector2(560, 360)
+	h.add_child(pa)
+	var va := UI.colonna(14)
+	pa.add_child(va)
+	va.add_child(UI.testo("APRI UNA GARA", 40, UI.GIALLO, true))
+	va.add_child(UI.testo("Scegli circuito, regole e piloti. Il gioco ti dà un codice di 4 lettere e un link da mandare agli altri: chi entra prende un posto «Online».", 24, UI.CHIARO, false, 510))
+	var sp := Control.new()
+	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	va.add_child(sp)
+	var ba := UI.bottone("APRI LA GARA", 34, Color(0.1, 0.6, 0.2), 510, 64)
+	ba.pressed.connect(func(): _voce("stanza_online"))
+	va.add_child(ba)
+	# entra
+	var pe := UI.pannello(UI.FONDO, Color(0.12, 0.45, 0.5), 16, 3, 22)
+	pe.custom_minimum_size = Vector2(560, 360)
+	h.add_child(pe)
+	var ve := UI.colonna(12)
+	pe.add_child(ve)
+	ve.add_child(UI.testo("ENTRA IN UNA GARA", 40, UI.GIALLO, true))
+	var e_cod := _campo(ve, "Codice della gara (4 lettere)", "", 4)
+	e_cod.add_theme_font_size_override("font_size", 40)
+	e_cod.text_changed.connect(func(x: String):
+		var c := e_cod.caret_column
+		e_cod.text = x.to_upper()
+		e_cod.caret_column = c)
+	var e_nome := _campo(ve, "Il tuo nome", nome_ospite, 16)
+	var sp2 := Control.new()
+	sp2.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ve.add_child(sp2)
+	var be := UI.bottone("ENTRA", 34, Color(0.12, 0.45, 0.5), 510, 64)
+	var vai := func():
+		var c := e_cod.text.strip_edges().to_upper()
+		if c.length() != 4:
+			avviso = "Il codice ha 4 lettere."
+			online()
+			return
+		nome_ospite = e_nome.text.strip_edges()
+		entra_gara.emit(c, nome_ospite if nome_ospite != "" else "Pilota")
+	be.pressed.connect(vai)
+	e_cod.text_submitted.connect(func(_x): e_nome.grab_focus())
+	e_nome.text_submitted.connect(func(_x): vai.call())
+	ve.add_child(be)
+	if avviso != "":
+		var a := UI.testo(avviso, 24, UI.GIALLO, false, 900)
+		a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vb.add_child(a)
+	var bi := UI.bottone("INDIETRO", 32, UI.FONDO2, 260, 64)
+	bi.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	bi.pressed.connect(func():
+		avviso = ""
+		principale())
+	vb.add_child(bi)
+
+func _campo(dove: VBoxContainer, etichetta: String, testo: String, lung: int) -> LineEdit:
+	dove.add_child(UI.testo(etichetta, 22, UI.GRIGIO))
+	var e := LineEdit.new()
+	e.text = testo
+	e.max_length = lung
+	e.custom_minimum_size = Vector2(510, 56)
+	e.add_theme_font_size_override("font_size", 28)
+	dove.add_child(e)
+	return e
 
 # ------------------------------------------------------------------ preparazione
 
@@ -234,6 +318,28 @@ func preparazione() -> void:
 			vs.add_child(_scelta("Assetto", [["Uguale", false], ["Libero", true]], libero, func(x):
 				libero = x
 				preparazione()))
+	if not strada:
+		# extra delle gare su strada, da aggiungere anche in circuito
+		var he := UI.riga(8)
+		var le := UI.testo("Extra", 26, UI.GRIGIO)
+		le.custom_minimum_size.x = 130
+		he.add_child(le)
+		var bn := UI.bottone("Nitro: " + ("sì" if nitro else "no"), 24, UI.ROSSO if nitro else UI.FONDO2, 0, 46)
+		bn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bn.pressed.connect(func():
+			nitro = not nitro
+			preparazione())
+		he.add_child(bn)
+		var ba := UI.bottone("Personaggi e abilità: " + ("sì" if abilita and regole == "avanzate" else "no"), 24,
+			UI.ROSSO if abilita and regole == "avanzate" else UI.FONDO2, 0, 46)
+		ba.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ba.disabled = regole != "avanzate"
+		ba.tooltip_text = "Solo con le regole avanzate"
+		ba.pressed.connect(func():
+			abilita = not abilita
+			preparazione())
+		he.add_child(ba)
+		vs.add_child(he)
 	vs.add_child(_scelta("Computer", [["Prudente", 0], ["Normale", 1], ["Esperto", 2]], livello, func(x):
 		livello = x
 		preparazione()))
@@ -245,6 +351,8 @@ func preparazione() -> void:
 		nota = "Qualifiche a settori: 3 tiri a giro, Q1-Q2-Q3 con 8 auto o più. " + nota0
 	elif strada:
 		nota = "Su strada: niente box, Nitro una volta per giro, controllo al traguardo." + (" Ogni pilota ha la sua auto e un'abilità." if regole == "avanzate" else "")
+	elif personaggi() or nitro:
+		nota = ("Nitro: una volta per giro, dopo il tiro, tante caselle in più quanto la marcia. " if nitro else "") + ("Ogni pilota ha un'abilità (vedi le Regole)." if personaggi() else "")
 	elif regole == "avanzate" and (meteo or libero):
 		nota = ("Il dado nero decide il tempo e si scelgono le gomme. " if meteo else "") + ("Ognuno ripartisce 20 punti fra le zone." if libero else "")
 	vs.add_child(UI.testo(nota, 20, UI.GRIGIO, false, 520))
@@ -268,7 +376,7 @@ func preparazione() -> void:
 			if tipo_stanza == "tv":
 				vq.add_child(UI.testo("Ogni pilota inquadra il QR con il telefono (o apre la pagina del telefono e scrive il codice).", 20, UI.CHIARO, false, 300))
 			else:
-				vq.add_child(UI.testo("Gli altri aprono il gioco sul loro computer, scelgono «Entra in una gara online» e scrivono il codice, oppure aprono il link.", 20, UI.CHIARO, false, 480))
+				vq.add_child(UI.testo("Gli altri aprono il gioco sul loro computer, scelgono «Gara online», «Entra in una gara» e scrivono il codice, oppure aprono il link.", 20, UI.CHIARO, false, 480))
 				var bl := UI.bottone("Copia il link della gara", 20, UI.FONDO2, 260, 40)
 				bl.pressed.connect(func():
 					DisplayServer.clipboard_set(link_gara())
@@ -367,6 +475,17 @@ func _quante() -> int:
 			n += 1
 	return n
 
+## Ci sono i personaggi con le loro abilità? (su strada sempre, in circuito se scelto; solo con le regole avanzate)
+func personaggi() -> bool:
+	return regole == "avanzate" and (strada or abilita)
+
+## Il nome del pilota di quell'auto: il personaggio, o il nome scelto, o «Pilota N».
+func nome_pilota(i: int) -> String:
+	if personaggi():
+		return Dati.PILOTI[i].nome
+	var n: String = str(nomi[i]).strip_edges() if i < nomi.size() else ""
+	return n if n != "" else "Pilota %d" % (i + 1)
+
 func _carta_pilota(i: int) -> Control:
 	var pl: Dictionary = Dati.PILOTI[i]
 	var posto: Dictionary = posti[i]
@@ -375,17 +494,34 @@ func _carta_pilota(i: int) -> Control:
 	var p := UI.pannello(UI.FONDO2, col if attivo else UI.FONDO2, 10, 3, 6)
 	var vb := UI.colonna(4)
 	p.add_child(vb)
-	var im := UI.immagine("res://assets/piloti/%s.webp" % pl.id, Vector2(170, 196))
+	var im := UI.immagine("res://assets/piloti/%s%s.webp" % [pl.id, "_strada" if personaggi() else ""], Vector2(170, 196))
 	im.modulate = Color.WHITE if attivo else Color(0.35, 0.35, 0.38)
 	vb.add_child(im)
-	var nome: String = pl.nome
-	if posto.tipo == "remoto":
-		nome = str(posto.nome) if posto.uid != "" else "in attesa..."
-	var l := UI.testo(nome, 22, UI.CHIARO if attivo else UI.GRIGIO)
-	l.custom_minimum_size.x = 170
-	l.clip_text = true
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(l)
+	if attivo and posto.tipo != "remoto" and not personaggi():
+		# il nome si può cambiare
+		var e := LineEdit.new()
+		e.text = nome_pilota(i)
+		e.max_length = 16
+		e.custom_minimum_size = Vector2(170, 34)
+		e.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		e.add_theme_font_size_override("font_size", 20)
+		e.select_all_on_focus = true
+		e.text_changed.connect(func(t: String):
+			while nomi.size() < Dati.PILOTI.size():
+				nomi.append("")
+			nomi[i] = t.strip_edges())
+		e.text_submitted.connect(func(_t): e.release_focus())
+		e.focus_exited.connect(func(): comando.emit("nomi"))
+		vb.add_child(e)
+	else:
+		var nome := nome_pilota(i)
+		if posto.tipo == "remoto":
+			nome = str(posto.nome) if posto.uid != "" else "in attesa..."
+		var l := UI.testo(nome, 22, UI.CHIARO if attivo else UI.GRIGIO)
+		l.custom_minimum_size = Vector2(170, 34)
+		l.clip_text = true
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vb.add_child(l)
 	var b := UI.bottone(_nome_tipo(posto.tipo), 20, COL_TIPO[posto.tipo], 170, 40)
 	b.pressed.connect(func():
 		var tipi := TIPI_STANZA if stanza else TIPI_LOCALE
@@ -446,16 +582,16 @@ func _via() -> void:
 	var lista := []
 	for i in posti.size():
 		var pz: Dictionary = posti[i]
-		var pl: Dictionary = Dati.PILOTI[i]
 		if pz.tipo == "ia" or pz.tipo == "umano":
-			lista.append({"nome": pl.nome, "pilota": i, "tipo": pz.tipo, "uid": ""})
+			lista.append({"nome": nome_pilota(i), "pilota": i, "tipo": pz.tipo, "uid": ""})
 		elif pz.tipo == "remoto" and pz.uid != "":
 			lista.append({"nome": str(pz.nome).left(16), "pilota": i, "tipo": "remoto", "uid": pz.uid})
 	if lista.is_empty():
 		return
 	var av := regole == "avanzate"
 	var conf := {"regole": regole, "pista": Dati.PISTE[pista_n], "giri": giri, "auto": lista, "livello": livello, "stanza": stanza,
-		"opzioni": {"strada": strada, "meteo": av and meteo, "libero": av and libero and not strada, "qualifiche": qualifiche and not strada}}
+		"opzioni": {"strada": strada, "meteo": av and meteo, "libero": av and libero and not strada, "qualifiche": qualifiche and not strada,
+			"abilita": av and (strada or abilita), "nitro": strada or nitro}}
 	if campionato:
 		conf.pista = camp_piste[0]
 		conf["campionato"] = {"piste": camp_piste.duplicate()}
@@ -465,6 +601,6 @@ func _via() -> void:
 func vista_attesa() -> Dictionary:
 	var l := []
 	for i in posti.size():
-		l.append({"p": i, "tp": posti[i].tipo, "u": posti[i].uid, "n": posti[i].nome})
-	return {"fase": "attesa", "sk": tipo_stanza, "pista": Dati.PISTE[pista_n], "giri": giri, "regole": regole, "posti": l, "str": strada,
+		l.append({"p": i, "tp": posti[i].tipo, "u": posti[i].uid, "n": posti[i].nome, "nm": str(posti[i].nome) if posti[i].tipo == "remoto" and not personaggi() else nome_pilota(i)})
+	return {"fase": "attesa", "sk": tipo_stanza, "abil": personaggi(), "pista": Dati.PISTE[pista_n], "giri": giri, "regole": regole, "posti": l, "str": strada,
 		"mon": regole == "avanzate" and meteo, "lib": regole == "avanzate" and libero and not strada}
