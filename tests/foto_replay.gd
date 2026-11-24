@@ -35,8 +35,14 @@ func _init():
 	main._comando("replay")
 	await create_timer(2.5).timeout
 	await _foto(dir, "2_replay")
-	await create_timer(3.0).timeout
-	await _foto(dir, "3_replay")
+	main._comando("replay_bordo")
+	await create_timer(1.5).timeout
+	await _foto(dir, "3_bordo")
+	await create_timer(2.0).timeout
+	await _foto(dir, "3b_bordo")
+	main._comando("replay_bordo_dopo")
+	await create_timer(1.5).timeout
+	await _foto(dir, "3c_bordo_altra")
 	main._comando("replay_veloce")
 	main._comando("replay_veloce")
 	main._comando("replay_veloce")

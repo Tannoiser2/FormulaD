@@ -866,17 +866,26 @@ func mostra_replay(m: Node, ultimo: int) -> void:
 	_rep_ultimo = ultimo
 	_svuota_azione()
 	p_azione.visible = true
-	azione.add_child(UI.testo("Replay della gara", 32, UI.GIALLO, true))
-	_rep_testo = UI.testo("Turno 1 di %d" % ultimo, 24, UI.CHIARO)
+	_rep_testo = UI.testo("Replay: turno 1 di %d" % ultimo, 22, UI.GIALLO, false, LARG_DX - 40)
+	_rep_testo.max_lines_visible = 2
 	azione.add_child(_rep_testo)
-	var h := UI.riga(10)
-	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	var h := UI.riga(8)
 	azione.add_child(h)
 	for b in [["Più lento", "replay_lento", UI.FONDO2], ["Più veloce", "replay_veloce", UI.FONDO2], ["Fine replay", "replay_fine", UI.ROSSO]]:
-		var bt := UI.bottone(b[0], 22, b[2], 150, 50)
+		var bt := UI.bottone(b[0], 21, b[2], 0, 46)
+		bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var cosa: String = b[1]
 		bt.pressed.connect(func(): comando.emit(cosa))
 		h.add_child(bt)
+	# la visuale: dall'alto o dalla cabina di un'auto
+	var h2 := UI.riga(8)
+	azione.add_child(h2)
+	for b in [["Dall'alto", "replay_alto"], ["< Auto", "replay_bordo_prima"], ["In cabina", "replay_bordo"], ["Auto >", "replay_bordo_dopo"]]:
+		var bt := UI.bottone(b[0], 21, UI.FONDO2, 0, 46)
+		bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var cosa: String = b[1]
+		bt.pressed.connect(func(): comando.emit(cosa))
+		h2.add_child(bt)
 
 ## La plancia prende lo spazio che resta in fondo alla colonna, al massimo la sua misura intera.
 func _adatta_plancia() -> void:
@@ -899,8 +908,10 @@ func _adatta_plancia() -> void:
 func _process(_d: float) -> void:
 	_adatta_plancia()
 	if _rep_mondo != null and _rep_mondo.replay_attivo and _rep_testo != null and is_instance_valid(_rep_testo):
-		_rep_testo.text = "Turno %d di %d  -  %s" % [_rep_mondo.replay_turno, _rep_ultimo,
-			"velocità normale" if is_equal_approx(_rep_mondo.replay_tempo, 1.0) else ("un turno ogni %.1f secondi" % _rep_mondo.replay_tempo).replace(".", ",")]
+		var b: int = _rep_mondo.bordo
+		var dove := "vista dall'alto" if b < 0 or not v.has("auto") or b >= v.auto.size() else "in cabina con %s" % str(v.auto[b].n)
+		_rep_testo.text = "Replay: turno %d di %d, %s, %s" % [_rep_mondo.replay_turno, _rep_ultimo,
+			"velocità normale" if is_equal_approx(_rep_mondo.replay_tempo, 1.0) else ("un turno ogni %.1f s" % _rep_mondo.replay_tempo).replace(".", ","), dove]
 
 
 ## I pallini delle fermate in curva accanto al nome nell'ordine di gioco.

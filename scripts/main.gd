@@ -109,6 +109,25 @@ func _ready() -> void:
 
 # ------------------------------------------------------------------ comandi
 
+## Nel replay, l'auto da cui guardare: quella di chi gioca qui (la prima di un giocatore, se ce ne sono), se no la vincitrice.
+func _auto_mia() -> int:
+	var v: Dictionary = hud.v
+	for i in v.auto.size():
+		if str(v.auto[i].tp) == "umano" or (str(v.auto[i].u) != "" and str(v.auto[i].u) == str(rete.uid)):
+			return i
+	var arr: Array = v.get("arrivi", [])
+	return int(arr[0]) if not arr.is_empty() else 0
+
+## Passa all'auto prima o dopo (salta quelle già fuori dalla pista nel replay).
+func _bordo_cambia(d: int) -> void:
+	var n: int = hud.v.auto.size()
+	var i: int = mondo.bordo if mondo.bordo >= 0 else _auto_mia() - d
+	for k in n:
+		i = posmod(i + d, n)
+		if mondo.auto.has(i) and mondo.auto[i].visible:
+			break
+	mondo.a_bordo(i)
+
 ## Il replay di tutta la gara, poi di nuovo la classifica finale.
 func _replay() -> void:
 	var v: Dictionary = hud.v
@@ -198,6 +217,13 @@ func _comando(cosa: String) -> void:
 			mondo.replay_tempo = min(mondo.replay_tempo * 1.5, 3.0)
 		"replay_veloce":
 			mondo.replay_tempo = max(mondo.replay_tempo / 1.5, 0.2)
+		"replay_alto":
+			mondo.a_bordo(-1)
+		"replay_bordo":
+			if mondo.bordo < 0:
+				mondo.a_bordo(_auto_mia())
+		"replay_bordo_prima", "replay_bordo_dopo":
+			_bordo_cambia(1 if cosa == "replay_bordo_dopo" else -1)
 		"replay_fine":
 			mondo.ferma_replay()
 		"rivincita":

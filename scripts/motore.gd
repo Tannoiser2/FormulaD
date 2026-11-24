@@ -1478,6 +1478,20 @@ func _storia(voce: Dictionary) -> void:
 
 ## Chi arriva nello stesso turno: vince chi va più oltre la linea; a parità chi l'ha tagliata prima.
 func _ordina_arrivi() -> void:
+	_ordina_arrivi_turno()
+	# nell'ordine di gioco le auto arrivate stanno nell'ordine d'arrivo
+	var posti := []
+	var arrivate := []
+	for k in s.ordine.size():
+		var a: Dictionary = s.auto[s.ordine[k]]
+		if int(a.get("posto_arrivo", 0)) > 0:
+			posti.append(k)
+			arrivate.append(a)
+	arrivate.sort_custom(func(x, y): return int(x.posto_arrivo) < int(y.posto_arrivo))
+	for k in posti.size():
+		s.ordine[posti[k]] = arrivate[k].i
+
+func _ordina_arrivi_turno() -> void:
 	var gruppo := []
 	for i in s.arrivi:
 		if int(s.auto[i].get("arr_turno", -1)) == int(s.turno):

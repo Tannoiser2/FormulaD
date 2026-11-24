@@ -59,6 +59,18 @@ func _ready() -> void:
 	e.ambient_light_energy = 0.75
 	env.environment = e
 	add_child(env)
+	# dalla cabina, nel replay, si vede il cielo: stessa luce, solo lo sfondo cambia
+	_env_bordo = e.duplicate()
+	_env_bordo.background_mode = Environment.BG_SKY
+	var cielo := ProceduralSkyMaterial.new()
+	cielo.sky_top_color = Color(0.32, 0.5, 0.75)
+	cielo.sky_horizon_color = Color(0.7, 0.76, 0.82)
+	cielo.ground_horizon_color = Color(0.45, 0.47, 0.5)
+	cielo.ground_bottom_color = Color(0.2, 0.21, 0.23)
+	cielo.sun_angle_max = 10.0
+	var sk := Sky.new()
+	sk.sky_material = cielo
+	_env_bordo.sky = sk
 	var sole := DirectionalLight3D.new()
 	sole.rotation_degrees = Vector3(-55, 35, 0)
 	sole.light_energy = 0.9
@@ -540,6 +552,11 @@ func segna_scelta(cid: String) -> void:
 
 func _process(d: float) -> void:
 	_due_dita()
+	if replay_attivo and _camera_bordo(d):
+		return
+	if cam.fov != 45 and bordo < 0:
+		cam.fov = 45
+		cam.near = 0.1
 	var k: float = min(1.0, d * 5.0)
 	bersaglio = bersaglio.lerp(_bersaglio_t, k)
 	distanza = lerp(distanza, _distanza_t, k)
@@ -721,6 +738,44 @@ var replay_attivo := false
 var replay_tempo := 1.0       # secondi per turno
 var replay_turno := 0
 var _replay_stop := false
+var bordo := -1               # nel replay: l'auto da cui si guarda in prima persona (-1 = dall'alto)
+var _bordo_avanti := Vector3.FORWARD
+var _env_bordo: Environment
+
+## Nel replay: guarda dalla cabina di quell'auto (-1 torna alla vista dall'alto).
+func a_bordo(i: int) -> void:
+	bordo = i
+	# dalla cabina niente nomi sopra le auto (coprirebbero la strada)
+	for k in auto:
+		_cartellino(k, i < 0)
+	if i >= 0 and auto.has(i):
+		var r: float = auto[i].rotation.y
+		_bordo_avanti = Vector3(sin(r), 0, cos(r))
+		cam.environment = _env_bordo
+	else:
+		cam.fov = 45
+		cam.near = 0.1
+		cam.environment = null
+
+func _cartellino(i: int, si: bool) -> void:
+	for c in auto[i].get_children():
+		if c is Label3D:
+			c.visible = si
+
+## La telecamera nella cabina: un po' sopra e dietro il pilota, guarda avanti lungo il verso dell'auto.
+func _camera_bordo(d: float) -> bool:
+	if bordo < 0 or not auto.has(bordo) or not auto[bordo].visible:
+		return false
+	var n: Node3D = auto[bordo]
+	var r: float = n.rotation.y
+	var av := Vector3(sin(r), 0, cos(r))
+	_bordo_avanti = _bordo_avanti.slerp(av, clamp(d * 6.0, 0.0, 1.0)).normalized()
+	cam.fov = 70
+	cam.near = 0.01
+	cam.h_offset = 0.0
+	cam.position = n.position + Vector3(0, 0.085, 0) + _bordo_avanti * 0.03
+	cam.look_at(cam.position + _bordo_avanti + Vector3(0, -0.09, 0), Vector3.UP)
+	return true
 
 ## Rivede tutta la gara: in ogni turno tutte le auto si muovono insieme, ognuna alla sua velocità
 ## (chi fa più caselle va più svelta), e un turno scorre nell'altro senza fermarsi.
@@ -806,6 +861,7 @@ func replay(storia: Dictionary, lista: Array) -> void:
 			_distanza_t = 11.0
 		await get_tree().process_frame
 	replay_attivo = false
+	a_bordo(-1)
 
 func ferma_replay() -> void:
 	_replay_stop = true
