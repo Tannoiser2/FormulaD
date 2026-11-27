@@ -6,6 +6,8 @@ extends Control
 signal via(conf: Dictionary)
 signal comando(cosa: String)
 signal entra_gara(codice: String, nome: String)
+signal camp_scegli(codice: String)
+signal camp_togli(codice: String)
 
 const TIPI_LOCALE := ["umano", "ia", "chiuso"]
 const TIPI_STANZA := ["remoto", "ia", "umano", "chiuso"]
@@ -31,7 +33,7 @@ var kers := false
 var nomi: Array = []     # i nomi scelti per i piloti (vuoto: «Pilota N»)
 var campionato := false
 var camp_piste: Array = []      # i circuiti scelti per il campionato, nell'ordine in cui si corrono
-var camp_salvato := ""          # riassunto del campionato in corso (vuoto se non ce n'è)
+var campionati: Array = []     # i campionati salvati qui: {codice, testo, finito, chi}
 var posti: Array = []        # per pilota: {tipo, uid, nome}
 var codice := ""
 var url := ""
@@ -111,9 +113,7 @@ func principale() -> void:
 	var altri := UI.riga(16)
 	altri.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(altri)
-	var sec := []
-	if camp_salvato != "":
-		sec.append(["CONTINUA IL CAMPIONATO", "camp_continua", Color(0.45, 0.1, 0.38)])
+	var sec := [["CONTINUA UN CAMPIONATO", "camp_lista", Color(0.45, 0.1, 0.38)]]
 	if ha_salvataggio:
 		sec.append(["RIPRENDI LA GARA SALVATA", "riprendi", Color(0.1, 0.55, 0.2)])
 	for x in sec:
@@ -121,8 +121,9 @@ func principale() -> void:
 		var cosa: String = x[1]
 		b.pressed.connect(func(): _voce(cosa))
 		altri.add_child(b)
-	if camp_salvato != "":
-		var c := UI.testo("Campionato in corso: " + camp_salvato, 20, UI.GRIGIO)
+	var in_corso := campionati.filter(func(x): return not x.finito)
+	if not in_corso.is_empty():
+		var c := UI.testo("Campionato in corso: %s (codice %s)" % [in_corso[0].testo, in_corso[0].codice], 20, UI.GRIGIO)
 		c.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		vb.add_child(c)
 	if avviso != "":
@@ -169,8 +170,8 @@ func _voce(cosa: String) -> void:
 			lari = true
 			_posti_iniziali()
 			preparazione()
-		"camp_continua":
-			comando.emit("camp_continua")
+		"camp_lista":
+			comando.emit("camp_lista")
 		"online":
 			online()
 		"stanza", "stanza_tv", "stanza_online":
@@ -187,6 +188,94 @@ func _voce(cosa: String) -> void:
 			comando.emit("apri_stanza")
 		_:
 			comando.emit(cosa)
+
+## I campionati salvati su questo dispositivo, e il recupero con il codice da qualsiasi altro.
+func campionati_schermo() -> void:
+	var vb := _nuovo_corpo()
+	var t := UI.testo("CONTINUA UN CAMPIONATO", 56, UI.ROSSO, true)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(t)
+	var h := UI.riga(30)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(h)
+	# elenco
+	var pl := UI.pannello(UI.FONDO, Color(0.45, 0.1, 0.38), 16, 3, 18)
+	pl.custom_minimum_size = Vector2(900, 520)
+	h.add_child(pl)
+	var vl := UI.colonna(10)
+	pl.add_child(vl)
+	vl.add_child(UI.testo("SU QUESTO DISPOSITIVO", 30, UI.GIALLO, true))
+	var sc := ScrollContainer.new()
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.custom_minimum_size = Vector2(860, 440)
+	vl.add_child(sc)
+	var lista := UI.colonna(8)
+	lista.custom_minimum_size.x = 840
+	sc.add_child(lista)
+	if campionati.is_empty():
+		lista.add_child(UI.testo("Nessun campionato salvato qui. Se ne hai iniziato uno su un altro dispositivo, scrivi a destra il suo codice.", 24, UI.GRIGIO, false, 820))
+	for c in campionati:
+		var r := UI.riga(10)
+		lista.add_child(r)
+		var vt := UI.colonna(0)
+		vt.custom_minimum_size.x = 520
+		vt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		r.add_child(vt)
+		vt.add_child(UI.testo("%s  -  codice %s" % [c.testo, c.codice], 24, UI.CHIARO if not c.finito else UI.GRIGIO, true, 520))
+		if str(c.chi) != "":
+			vt.add_child(UI.testo("Giocatori: " + str(c.chi), 20, UI.GRIGIO, false, 520))
+		var cod: String = c.codice
+		if not c.finito:
+			var bc := UI.bottone("CONTINUA", 24, Color(0.1, 0.55, 0.2), 170, 54)
+			bc.pressed.connect(func(): camp_scegli.emit(cod))
+			r.add_child(bc)
+		var bt := UI.bottone("Togli", 22, UI.FONDO2, 110, 54)
+		bt.tooltip_text = "Lo toglie da questo dispositivo; online resta e si recupera con il codice"
+		bt.pressed.connect(func(): camp_togli.emit(cod))
+		r.add_child(bt)
+	# recupero con il codice
+	var pr := UI.pannello(UI.FONDO, Color(0.12, 0.45, 0.5), 16, 3, 18)
+	pr.custom_minimum_size = Vector2(460, 520)
+	h.add_child(pr)
+	var vr := UI.colonna(12)
+	pr.add_child(vr)
+	vr.add_child(UI.testo("CON IL CODICE", 30, UI.GIALLO, true))
+	vr.add_child(UI.testo("Ogni campionato si salva anche online. Scrivi il suo codice di 6 lettere (è nella classifica del campionato) e riprendilo da qui, anche se l'hai iniziato su un altro computer o tablet.", 22, UI.CHIARO, false, 420))
+	var e := LineEdit.new()
+	e.max_length = 6
+	e.placeholder_text = "ABCDEF"
+	e.custom_minimum_size = Vector2(420, 64)
+	e.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	e.add_theme_font_size_override("font_size", 40)
+	e.text_changed.connect(func(x: String):
+		var col := e.caret_column
+		e.text = x.to_upper()
+		e.caret_column = col)
+	vr.add_child(e)
+	var sp := Control.new()
+	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vr.add_child(sp)
+	var br := UI.bottone("RECUPERA", 32, Color(0.12, 0.45, 0.5), 420, 64)
+	var vai := func():
+		var c := e.text.strip_edges().to_upper()
+		if c.length() != 6:
+			avviso = "Il codice del campionato ha 6 lettere."
+			campionati_schermo()
+			return
+		camp_scegli.emit(c)
+	br.pressed.connect(vai)
+	e.text_submitted.connect(func(_x): vai.call())
+	vr.add_child(br)
+	if avviso != "":
+		var a := UI.testo(avviso, 24, UI.GIALLO, false, 1300)
+		a.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vb.add_child(a)
+	var bi := UI.bottone("INDIETRO", 32, UI.FONDO2, 260, 64)
+	bi.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	bi.pressed.connect(func():
+		avviso = ""
+		principale())
+	vb.add_child(bi)
 
 ## Gara online: aprire una gara nuova o entrare in quella di un altro con il codice.
 var nome_ospite := ""

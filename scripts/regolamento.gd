@@ -197,7 +197,7 @@ Con 8 auto o più: Q1 per tutti (gli ultimi vengono fissati in fondo alla grigli
 ["Campionato", """Il campionato segue il regolamento di Gianluca Lari (versione 1.2), con le qualifiche a settori al posto del giro cronometrato.
 
 [b]Come si gioca[/b]
-Si scelgono i circuiti (l'ordine in cui si toccano è l'ordine delle gare), i giri (il regolamento ne prevede 3) e i piloti. Prima di ogni Gran Premio ci sono le qualifiche, poi la gara. Fra un GP e l'altro il campionato si salva: dal menu «Continua il campionato».
+Si scelgono i circuiti (l'ordine in cui si toccano è l'ordine delle gare), i giri (il regolamento ne prevede 3) e i piloti. Prima di ogni Gran Premio ci sono le qualifiche, poi la gara. Il campionato si salva da solo dopo ogni GP, su questo dispositivo e online. Ogni campionato ha un codice di 6 lettere (è nella classifica): dal menu «Continua un campionato» lo riprendi da qui o, scrivendo il codice, da qualsiasi altro computer o tablet.
 
 [b]Punti[/b]
 I primi cinque arrivati prendono [b]8, 6, 4, 2 e 1[/b] punti. Le auto ritirate non prendono punti.

@@ -1018,6 +1018,10 @@ func mostra_campionato() -> void:
 	var c := campionato
 	var finito: bool = c.get("finito", false)
 	var vb := _apri_velo("CAMPIONATO FINITO" if finito else "CAMPIONATO  -  DOPO %d GP DI %d" % [int(c.gp), c.piste.size()], 1500)
+	if str(c.get("codice", "")) != "":
+		var lcod := UI.testo("Codice del campionato: %s  -  con il codice lo riprendi da qualsiasi dispositivo («Continua un campionato» nel menu)" % c.codice, 22, UI.CHIARO)
+		lcod.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vb.add_child(lcod)
 	if finito:
 		var cl := Campionato.piloti(c)
 		var sc := Campionato.scuderie(c)

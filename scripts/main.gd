@@ -48,6 +48,8 @@ func _ready() -> void:
 	if nomi is Array:
 		menu.nomi = nomi
 	menu.nome_ospite = rete.carica("fd_nome")
+	menu.camp_scegli.connect(_continua_camp)
+	menu.camp_togli.connect(_togli_camp)
 	menu.entra_gara.connect(func(c: String, n: String):
 		if not rete.web:
 			menu.avviso = "Per entrare in una gara online apri la versione web del gioco."
@@ -77,6 +79,9 @@ func _ready() -> void:
 	if rete.web and not menu.ha_salvataggio:
 		rete.chiedi_remoto()
 	var par := rete.parametri()
+	if par.has("campionato") and str(par.campionato).length() == 6:
+		# link diretto a un campionato: ...index.html?campionato=ABCDEF
+		_continua_camp.call_deferred(str(par.campionato))
 	if par.has("veloce"):
 		mondo.velocita = max(0.5, float(par.veloce))
 	if par.has("stanza"):
@@ -233,9 +238,9 @@ func _comando(cosa: String) -> void:
 				_via(_ultima_conf)
 		"esci":
 			_al_menu()
-		"camp_continua":
-			_carica_campionato()
-			_gp()
+		"camp_lista":
+			_menu_campionati()
+			menu.campionati_schermo()
 		"camp_prossimo":
 			hud.chiudi_velo()
 			_gp()
@@ -291,15 +296,121 @@ func _al_menu() -> void:
 
 var camp: Dictionary = {}
 
+# ------------------------------------------------------------------ campionati salvati
+# Ogni campionato ha un codice di 6 lettere. Si salva qui (fd_camp_<codice>, elenco in fd_campionati) e online
+# (formulad/campagne/<codice>): con il codice lo si riprende da qualsiasi dispositivo.
+
+var _camp_attesa := ""   # il codice chiesto online, in attesa di risposta
+
+func _camp_codici() -> Array:
+	var t: String = rete.carica("fd_campionati")
+	var x = JSON.parse_string(t) if t != "" else null
+	return x if x is Array else []
+
+func _camp_locale(cod: String) -> Dictionary:
+	var d = _leggi_campionato(rete.carica("fd_camp_" + cod))
+	return d
+
+## Legge un campionato salvato (anche quello scaricato da internet): solo dati, niente oggetti.
+func _leggi_campionato(t: String) -> Dictionary:
+	if t == "" or t.contains("Object(") or t.contains("Resource("):
+		return {}
+	var d = str_to_var(t)
+	return d if d is Dictionary and d.has("piste") and d.has("gp") else {}
+
+static func nuovo_codice_camp() -> String:
+	const L := "ABCDEFGHJKLMNPQRSTUVWXYZ"
+	var c := ""
+	for k in 6:
+		c += L[randi() % L.length()]
+	return c
+
+## All'avvio: sposta il vecchio campionato unico nell'elenco e prepara l'elenco per il menu.
 func _carica_campionato() -> void:
-	var d = str_to_var(rete.carica("fd_campionato"))
-	camp = d if d is Dictionary and d.has("piste") else {}
-	menu.camp_salvato = ""
-	if not camp.is_empty() and not camp.finito:
-		menu.camp_salvato = "Gran Premio %d di %d: %s" % [int(camp.gp) + 1, camp.piste.size(), Campionato.nome_pista(camp.piste[int(camp.gp)])]
+	var vecchio := _leggi_campionato(rete.carica("fd_campionato"))
+	if not vecchio.is_empty():
+		camp = vecchio
+		_salva_campionato()
+		rete.salva("fd_campionato", "")
+	_menu_campionati()
+
+func _menu_campionati() -> void:
+	var l := []
+	for cod in _camp_codici():
+		var c := _camp_locale(str(cod))
+		if c.is_empty():
+			continue
+		var t := ""
+		if c.finito:
+			var cl := Campionato.piloti(c)
+			t = "Finito: campione %s" % (str(cl[0].n) if not cl.is_empty() else "")
+		else:
+			t = "Gran Premio %d di %d: %s" % [int(c.gp) + 1, c.piste.size(), Campionato.nome_pista(c.piste[int(c.gp)])]
+		var chi := []
+		for a in c.auto:
+			if str(a.get("tipo", "")) != "ia":
+				chi.append(Dati.corto(str(a.nome)))
+		l.append({"codice": str(cod), "testo": t, "finito": bool(c.finito), "chi": ", ".join(PackedStringArray(chi)),
+			"quando": float(c.get("salvato", 0))})
+	menu.campionati = l
 
 func _salva_campionato() -> void:
-	rete.salva("fd_campionato", var_to_str(camp))
+	if not camp.has("codice"):
+		camp["codice"] = nuovo_codice_camp()
+	camp["salvato"] = Time.get_unix_time_from_system()
+	var cod: String = camp.codice
+	var testo := var_to_str(camp)
+	rete.salva("fd_camp_" + cod, testo)
+	var l := _camp_codici()
+	l.erase(cod)
+	l.push_front(cod)
+	rete.salva("fd_campionati", JSON.stringify(l))
+	rete.salva_campionato(cod, testo)
+	_menu_campionati()
+
+## Continua un campionato: prima guarda online se c'è una versione più nuova (giocata da un altro dispositivo).
+func _continua_camp(cod: String) -> void:
+	cod = cod.strip_edges().to_upper()
+	if not rete.web:
+		_camp_pronto(cod, "")
+		return
+	_camp_attesa = cod
+	menu.avviso = "Cerco il campionato %s..." % cod
+	menu.campionati_schermo()
+	rete.chiedi_campionato(cod)
+	await get_tree().create_timer(6.0).timeout
+	if _camp_attesa == cod:
+		_camp_pronto(cod, "")
+
+func _camp_pronto(cod: String, online: String) -> void:
+	_camp_attesa = ""
+	var loc := _camp_locale(cod)
+	var onl := _leggi_campionato(online)
+	var c := loc
+	if not onl.is_empty() and (loc.is_empty() or float(onl.get("salvato", 0)) > float(loc.get("salvato", 0))):
+		c = onl
+	if c.is_empty():
+		menu.avviso = "Non trovo il campionato %s: controlla il codice." % cod
+		menu.campionati_schermo()
+		return
+	camp = c
+	camp["codice"] = cod
+	print("campionato ripreso %s, gran premio %d (%s)" % [cod, int(camp.gp) + 1, "online" if c == onl else "da questo dispositivo"])
+	_salva_campionato()
+	menu.avviso = ""
+	if camp.finito:
+		menu.avviso = "Il campionato %s è finito." % cod
+		menu.campionati_schermo()
+		return
+	_gp()
+
+func _togli_camp(cod: String) -> void:
+	var l := _camp_codici()
+	l.erase(cod)
+	rete.salva("fd_campionati", JSON.stringify(l))
+	rete.salva("fd_camp_" + cod, "")
+	_menu_campionati()
+	menu.campionati_schermo()
 
 ## Il Gran Premio corrente del campionato.
 func _gp() -> void:
@@ -335,6 +446,7 @@ func _via(conf: Dictionary) -> void:
 	if conf.has("campionato"):
 		camp = Campionato.nuovo(conf, _esperienza())
 		_salva_campionato()
+		hud.cronaca("Codice del campionato: %s. Con questo codice lo riprendi da qualsiasi dispositivo (Continua un campionato)." % camp.codice, "ordine")
 		_gp()
 		return
 	_ultima_conf = conf
@@ -687,6 +799,9 @@ func _evento_rete(e: Dictionary) -> void:
 			if d is Dictionary:
 				_coda_ospite.append(d)
 				_ciclo_ospite()
+		"campionato":
+			if str(e.get("codice", "")) == _camp_attesa and _camp_attesa != "":
+				_camp_pronto(_camp_attesa, str(e.get("dati", "")))
 		"salvataggio":
 			if str(e.get("j", "")) != "" and rete.carica("fd_gara") == "":
 				rete.salva("fd_gara", str(e.j))

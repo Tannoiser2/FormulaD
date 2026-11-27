@@ -117,6 +117,15 @@ func salva_stanza(v: String) -> void:
 	if fr:
 		fr.salvaStanza(v)
 
+## Il campionato online (formulad/campagne/<codice>): si riprende da qualsiasi dispositivo con il codice.
+func salva_campionato(codice: String, v: String) -> void:
+	if fr:
+		fr.salvaCampionato(codice, v)
+
+func chiedi_campionato(codice: String) -> void:
+	if fr:
+		fr.caricaCampionato(codice)
+
 func chiedi_remoto() -> void:
 	if fr:
 		fr.caricaRemoto()

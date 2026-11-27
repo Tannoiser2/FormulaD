@@ -141,6 +141,14 @@ window.FR = {
   async salvaRemoto(v) {
     try { await pronta(); await rete.set(`formulad/salvataggi/${rete.uid}`, v ? { stato: v } : null); } catch (e) { console.warn('salvataggio remoto', e); }
   },
+  // campionati: formulad/campagne/<codice di 6 lettere>, li riprende chiunque abbia il codice
+  async salvaCampionato(codice, v) {
+    try { await pronta(); await rete.set(`formulad/campagne/${codice}`, { dati: v, quando: Date.now() }); } catch (e) { console.warn('campionato online', e); }
+  },
+  async caricaCampionato(codice) {
+    try { await pronta(); const v = await rete.get(`formulad/campagne/${codice}`); coda.push({ e: 'campionato', codice, dati: v?.dati || '' }); }
+    catch (e) { console.warn(e); coda.push({ e: 'campionato', codice, dati: '', errore: true }); }
+  },
   async caricaRemoto() {
     try { await pronta(); const v = await rete.get(`formulad/salvataggi/${rete.uid}`); coda.push({ e: 'salvataggio', j: v?.stato || '' }); } catch (e) { console.warn(e); }
   },
