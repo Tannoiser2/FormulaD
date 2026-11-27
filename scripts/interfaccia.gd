@@ -306,6 +306,7 @@ func mostra_plancia(i: int) -> void:
 		extra += "  -  gomme %s" % Dati.NOMI_GOMME[str(a.get("gt", "dure"))].to_lower()
 	if v.get("str", false):
 		extra += "  -  Nitro %s" % ("pronto" if a.get("ni", false) else "usato")
+	extra += Interfaccia.testo_curva(a)
 	extra += Interfaccia.testo_danni(v, a)
 	plancia_nome.text = "%s  -  %s%s%s" % [a.n, Dati.NOMI_MARCE[int(a.m)] if int(a.m) > 0 else "in griglia",
 		"  -  tiro %d" % int(a.d) if int(a.d) > 0 else "", extra]
@@ -649,6 +650,14 @@ func _esito(tiro: int, liv: int, persi: int) -> Control:
 	giu.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(giu)
 	return p
+
+## Quante caselle mancano alla prossima curva.
+static func testo_curva(a: Dictionary) -> String:
+	var pc: Array = a.get("pc", [])
+	if pc.size() < 3:
+		return ""
+	return "  -  curva %d (%d fermat%s) tra %d casell%s" % [int(pc[1]), int(pc[2]), "a" if int(pc[2]) == 1 else "e",
+		int(pc[0]), "a" if int(pc[0]) == 1 else "e"]
 
 ## KERS, meccanici e danni gravi di un'auto, per la riga sopra la plancia.
 static func testo_danni(v: Dictionary, a: Dictionary) -> String:

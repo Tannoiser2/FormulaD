@@ -130,6 +130,23 @@ while (Date.now() - t0 < DURATA && !fine) {
         for (const q of tel) if (q !== p) await foto(q, 'tel_3_attesa');
         await foto(tv, 'tv_4_mossa_telefono');
         fotoMossa = true;
+        // ingrandisce con la rotella e sposta trascinando con il mouse (come un dito)
+        const bx = await p.locator('#mappa').boundingBox();
+        const cx = bx.x + bx.width / 2, cy = bx.y + bx.height / 2;
+        await p.mouse.move(cx, cy);
+        for (let k = 0; k < 4; k++) { await p.mouse.wheel(0, -250); await p.waitForTimeout(80); }
+        await p.waitForTimeout(200);
+        await foto(p, 'tel_4_zoom');
+        await p.mouse.move(cx, cy); await p.mouse.down();
+        for (let k = 1; k <= 10; k++) { await p.mouse.move(cx + k * 12, cy + k * 6); await p.waitForTimeout(20); }
+        await p.mouse.up();
+        await p.waitForTimeout(250);
+        await foto(p, 'tel_5_spostata');
+        // la scelta resta e un tocco senza trascinare sceglie ancora la casella
+        const ancora = await p.evaluate(() => window.FDprova.stato().att?.tipo);
+        console.log('dopo zoom e trascinamento la scelta è ancora aperta:', ancora);
+        await p.click('#centra');
+        await p.waitForTimeout(200);
       }
       await p.evaluate((c) => window.FDprova.manda({ t: 'mossa', c }), best.c);
       fatte++;

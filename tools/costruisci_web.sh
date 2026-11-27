@@ -14,5 +14,7 @@ cp -r web/telefono.html web/js web/css web/font web/img build/web/
 V=$(date -u +%Y%m%d%H%M)
 sed -i "s/__VERSIONE__/$V/g" build/web/index.html
 sed -i "s#js/telefono.js#js/telefono.js?v=$V#; s#css/telefono.css#css/telefono.css?v=$V#" build/web/telefono.html
+# anche i moduli importati dagli altri moduli, altrimenti un file vecchio in cache rompe gli import
+sed -i -E "s#from '\./(rete|suoni)\.js'#from './\1.js?v=$V'#g" build/web/js/ponte.js build/web/js/telefono.js
 touch build/web/.nojekyll
 echo "Pronto in build/web"

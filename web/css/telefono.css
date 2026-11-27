@@ -70,6 +70,7 @@ body.gara #app { max-width: none; height: 100%; display: block; }
 .esiti b { display: block; font-size: 18px; font-weight: 700; }
 .pista { grid-area: pista; position: relative; min-width: 0; min-height: 0; border-radius: 10px; overflow: hidden; background: #000; }
 .pista canvas { display: block; touch-action: none; }
+.pista .centra { position: absolute; top: 6px; right: 6px; left: auto; width: auto; display: none; min-height: 0; margin: 0; font-size: 15px; padding: 4px 14px; opacity: 0.92; }
 .dettaglio { min-height: 34px; color: #ffd21a; font-size: 16px; line-height: 1.15; }
 .dettaglio.male { color: #ff7a6b; }
 @media (orientation: landscape) {

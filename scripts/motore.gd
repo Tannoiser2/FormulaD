@@ -315,6 +315,15 @@ func _esce(a: Dictionary, z: Dictionary, resta: int) -> bool:
 		return resta < 0 and a.get("dz", {}).has(z.id)
 	return resta <= int(z.fuori)
 
+## Per il pannello: [caselle, curva, fermate] fino alla prossima curva; [] se non serve (box, arrivata).
+func _prossima_curva(a: Dictionary) -> Array:
+	if a.c == "" or a.fuori or int(a.get("posto_arrivo", 0)) > 0 or not pista.per_id.has(a.c):
+		return []
+	var pc := pista.prossima_curva(a.c)
+	if int(pc[0]) < 0:
+		return []
+	return [int(pc[0]), int(pc[1]), int(pista.fermate.get(int(pc[1]), 1))]
+
 func lari() -> bool:
 	return s.get("lari", false)
 
@@ -1555,7 +1564,8 @@ func vista() -> Dictionary:
 			"f": a.fuori, "pa": a.posto_arrivo, "t": a.testa, "d": a.dado, "mo": a.mosso == s.turno, "w": a.perche,
 			"dv": a.get("dove", ""), "gt": a.get("gomme_tipo", "dure"), "et": int(a.get("eta", 0)),
 			"ni": s.get("nitro", s.get("strada", false)) and int(a.get("nitro", -99)) != a.giro, "pf0": a.get("pf0", {}), "fs": _fermate_ora(a),
-			"pp": int(a.get("pp", 0)), "pk": int(a.get("pk", 0)), "pm": int(a.get("pmec", 0)), "dz": a.get("dz", {})})
+			"pp": int(a.get("pp", 0)), "pk": int(a.get("pk", 0)), "pm": int(a.get("pmec", 0)), "dz": a.get("dz", {}),
+			"pc": _prossima_curva(a)})
 	if s.has("q"):
 		v["q"] = s.q
 	if s.has("camp"):

@@ -20,6 +20,14 @@ export function sbloccaAudio() {
   } catch (e) { /* ok */ }
 }
 
+// Il browser fa partire l'audio solo dopo un gesto: ogni tocco o tasto lo sblocca (o lo riprende se il
+// sistema l'ha sospeso, come fa iPad quando si cambia app). Sta qui, nello stesso modulo che suona.
+for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) {
+  document.addEventListener(ev, sbloccaAudio, { capture: true, passive: true });
+}
+let suonati = 0;
+export function statoAudio() { return `${ctx ? ctx.state : 'spento'}, suoni fatti ${suonati}`; }
+
 export function attivaSuoni(si) {
   attivi = !!si;
   try { localStorage.setItem('fd_suoni', attivi ? 'si' : 'no'); } catch (e) { /* ok */ }
@@ -195,6 +203,7 @@ function folla() {
 
 export function suona(n, o = {}) {
   if (!ctx || !attivi) return;
+  suonati++;
   try {
     switch (n) {
       case 'dado': for (let i = 0; i < 5; i++) rumore(0.04, 0.7, i * 0.08 + Math.random() * 0.02, 'bandpass', 2500 + Math.random() * 1500, 2); break;

@@ -257,6 +257,7 @@ function disegna() {
     if (stato.mt >= 0) st += ` - ${METEO[stato.mt]}`;
     if (stato.mon) st += ` - gomme ${(GOMME[mia.gt] || 'dure').toLowerCase()}`;
     if (stato.str) st += ` - Nitro ${mia.ni ? 'pronto' : 'usato'}`;
+    if (mia.pc && mia.pc.length === 3) st += ` - curva ${mia.pc[1]} (${mia.pc[2]} fermat${mia.pc[2] === 1 ? 'a' : 'e'}) tra ${mia.pc[0]} casell${mia.pc[0] === 1 ? 'a' : 'e'}`;
     if (stato.kers) st += ` - KERS ${mia.pk || 0}`;
     if (stato.lari) st += ` - meccanici ${mia.pm || 0}`;
     const DZ = { musetto: 'senza musetto (max 3a)', potenza: 'motore senza potenza', affidabile: 'motore da controllare', sospensioni: 'sospensioni rotte' };
@@ -272,7 +273,7 @@ function disegna() {
   app.innerHTML = `<div class="gioco ${prep ? 'prep' : ''}">
     <div class="ordine">${ordine(io)}</div>
     <div class="cruscotto ${tocca ? 'tocca' : ''}">${mia && !prep ? '<canvas id="plancia"></canvas>' : ''}${testa}<div class="azione">${az}</div></div>
-    <div class="pista"><canvas id="mappa"></canvas></div></div>`;
+    <div class="pista"><canvas id="mappa"></canvas><button id="centra" class="centra">Centra</button></div></div>`;
   app.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { assPf[b.dataset.z] += Number(b.dataset.d); disegna(); }; });
   app.querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => { assG = b.dataset.g; disegna(); }; });
   app.querySelectorAll('[data-qm]').forEach((b) => { b.onclick = () => manda({ t: 'qualifica', m: Number(b.dataset.qm) }); });
@@ -454,7 +455,12 @@ function mappa(mia, att, vistaM) {
   const larg = cv.parentElement.clientWidth || 320, alt = Math.max(140, cv.parentElement.clientHeight || 240);
   let w = Math.max(x1 - x0, 380), hh = Math.max(y1 - y0, 260);
   if (hh / w > alt / larg) w = hh * larg / alt; else hh = w * alt / larg;
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  // zoom e spostamento scelti con le dita (si azzerano quando arrivano nuove caselle da scegliere)
+  const chiaveV = toccabili ? `m${stato.n}` : '';
+  if (chiaveV && chiaveV !== vm.chiave) { vm.z = 1; vm.dx = 0; vm.dy = 0; }
+  vm.chiave = chiaveV;
+  w /= vm.z; hh /= vm.z;
+  const cx = (x0 + x1) / 2 + vm.dx, cy = (y0 + y1) / 2 + vm.dy;
   x0 = cx - w / 2; y0 = cy - hh / 2;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = Math.round(larg * dpr);
@@ -551,10 +557,28 @@ function mappa(mia, att, vistaM) {
     g.strokeStyle = a === mia ? '#fff' : '#000';
     g.stroke();
   }
+  ultimaMappa = [mia, att, vistaM];
+  const bc = document.getElementById('centra');
+  if (bc) {
+    bc.style.display = vm.z !== 1 || vm.dx !== 0 || vm.dy !== 0 ? 'block' : 'none';
+    bc.onclick = () => { vm.z = 1; vm.dx = 0; vm.dy = 0; ridisegnaMappa(); };
+  }
+  mappaGeo.bpc = w / larg;      // pixel del tabellone per pixel css
   cv.onpointerdown = (ev) => {
+    gesto.punti.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (gesto.punti.size === 1) { gesto.mosso = false; gesto.x = ev.clientX; gesto.y = ev.clientY; }
+    else gesto.mosso = true;
+  };
+  cv.onwheel = (ev) => {
+    ev.preventDefault();
+    vm.z = Math.min(4, Math.max(0.6, vm.z * Math.exp(-ev.deltaY * 0.0015)));
+    ridisegnaMappa();
+  };
+  // un tocco senza trascinare: sceglie la casella
+  mappaGeo.tocco = (cx, cy) => {
     if (!toccabili) return;
     const b = cv.getBoundingClientRect();
-    const x = (ev.clientX - b.left) * (cv.width / b.width), y = (ev.clientY - b.top) * (cv.height / b.height);
+    const x = (cx - b.left) * (cv.width / b.width), y = (cy - b.top) * (cv.height / b.height);
     let best = null, bd = r * 2.2;
     for (const o of opz) {
       const d = Math.hypot(px(o.x) - x, py(o.y) - y);
@@ -566,6 +590,49 @@ function mappa(mia, att, vistaM) {
     disegna();
   };
 }
+
+// Pan e zoom della mappa con le dita: un dito trascina, due dita pizzicano; la rotella del mouse ingrandisce.
+const vm = { z: 1, dx: 0, dy: 0, chiave: '' };
+const gesto = { punti: new Map(), mosso: false, x: 0, y: 0 };
+const mappaGeo = { bpc: 1, tocco: null };
+let ultimaMappa = null;
+let _rafMappa = 0;
+function ridisegnaMappa() {
+  if (_rafMappa) return;
+  _rafMappa = requestAnimationFrame(() => { _rafMappa = 0; if (ultimaMappa && document.getElementById('mappa')) mappa(...ultimaMappa); });
+}
+window.addEventListener('pointermove', (ev) => {
+  const prima = gesto.punti.get(ev.pointerId);
+  if (!prima) return;
+  const ora = { x: ev.clientX, y: ev.clientY };
+  if (gesto.punti.size === 1) {
+    if (!gesto.mosso && Math.hypot(ora.x - gesto.x, ora.y - gesto.y) > 8) gesto.mosso = true;
+    if (gesto.mosso) {
+      vm.dx -= (ora.x - prima.x) * mappaGeo.bpc;
+      vm.dy -= (ora.y - prima.y) * mappaGeo.bpc;
+      ridisegnaMappa();
+    }
+    gesto.punti.set(ev.pointerId, ora);
+    return;
+  }
+  const [a, b] = [...gesto.punti.values()];
+  const d0 = Math.hypot(a.x - b.x, a.y - b.y), m0 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  gesto.punti.set(ev.pointerId, ora);
+  const [c, d] = [...gesto.punti.values()];
+  const d1 = Math.hypot(c.x - d.x, c.y - d.y), m1 = { x: (c.x + d.x) / 2, y: (c.y + d.y) / 2 };
+  if (d0 > 10 && d1 > 10) vm.z = Math.min(4, Math.max(0.6, vm.z * (d1 / d0)));
+  vm.dx -= (m1.x - m0.x) * mappaGeo.bpc;
+  vm.dy -= (m1.y - m0.y) * mappaGeo.bpc;
+  ridisegnaMappa();
+});
+const fineGesto = (ev) => {
+  if (!gesto.punti.has(ev.pointerId)) return;
+  const unico = gesto.punti.size === 1;
+  gesto.punti.delete(ev.pointerId);
+  if (unico && !gesto.mosso && ev.type === 'pointerup' && mappaGeo.tocco) mappaGeo.tocco(ev.clientX, ev.clientY);
+};
+window.addEventListener('pointerup', fineGesto);
+window.addEventListener('pointercancel', fineGesto);
 
 let _rid = 0;
 window.addEventListener('resize', () => { clearTimeout(_rid); _rid = setTimeout(disegna, 120); });

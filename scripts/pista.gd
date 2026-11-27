@@ -156,7 +156,41 @@ func togli_casella(cid: String) -> bool:
 	_ricalcola()
 	return true
 
+var _cache_curva := {}
+
+## Quante caselle mancano alla prossima curva (la prima casella di una curva diversa da quella in cui si è),
+## seguendo la strada più corta: [caselle, numero della curva]. [-1, 0] se non ce n'è.
+func prossima_curva(cid: String) -> Array:
+	if _cache_curva.has(cid):
+		return _cache_curva[cid]
+	var out := [-1, 0]
+	var da = per_id.get(cid)
+	if da != null:
+		var qui := int(da.c)
+		var visti := {cid: true}
+		var giro := [cid]
+		var passi := 0
+		while not giro.is_empty() and passi < 200 and out[0] < 0:
+			passi += 1
+			var dopo := []
+			for x in giro:
+				for n in per_id[x].get("n", []):
+					if visti.has(n) or not per_id.has(n):
+						continue
+					visti[n] = true
+					var c = per_id[n]
+					if int(c.c) > 0 and int(c.c) != qui:
+						out = [passi, int(c.c)]
+						break
+					dopo.append(n)
+				if out[0] >= 0:
+					break
+			giro = dopo
+	_cache_curva[cid] = out
+	return out
+
 func _ricalcola() -> void:
+	_cache_curva.clear()
 	_cache_avanti.clear()
 	dimensione_curva.clear()
 	for c in caselle:

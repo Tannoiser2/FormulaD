@@ -43,7 +43,6 @@ $GODOT_HEAD_INCLUDE
 <script src="$GODOT_URL?v=__VERSIONE__"></script>
 <script type="module">
 import './js/ponte.js?v=__VERSIONE__';
-import { sbloccaAudio } from './js/suoni.js?v=__VERSIONE__';
 
 const GODOT_CONFIG = $GODOT_CONFIG;
 // ogni pubblicazione ha il suo numero: il browser non riusa la versione vecchia del gioco
@@ -83,7 +82,7 @@ async function parti() {
   }
 }
 // si parte subito; l'audio e lo schermo acceso si sbloccano al primo tocco
-const sblocca = () => { sbloccaAudio(); schermoAcceso(); };
+const sblocca = () => { window.FR?.sbloccaAudio?.(); schermoAcceso(); };
 document.addEventListener('pointerdown', sblocca, { once: true, capture: true });
 document.addEventListener('keydown', sblocca, { once: true, capture: true });
 parti();
