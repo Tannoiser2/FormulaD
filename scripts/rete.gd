@@ -66,9 +66,17 @@ func azione(k: String, d: Dictionary) -> void:
 	if fr:
 		fr.azione(k, JSON.stringify(d))
 
-func suono(n: String) -> void:
+func suono(n: String, dati := {}) -> void:
 	if fr:
-		fr.suono(n)
+		fr.suono(n, JSON.stringify(dati))
+
+## Effetti sonori accesi o spenti (la scelta resta salvata nel browser).
+func attiva_suoni(si: bool) -> void:
+	if fr:
+		fr.attivaSuoni(si)
+
+func suoni_attivi() -> bool:
+	return bool(fr.suoniAttivi()) if fr else false
 
 func schermo_intero() -> void:
 	if fr:

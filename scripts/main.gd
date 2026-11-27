@@ -48,6 +48,9 @@ func _ready() -> void:
 	if nomi is Array:
 		menu.nomi = nomi
 	menu.nome_ospite = rete.carica("fd_nome")
+	menu.suoni = rete.suoni_attivi()
+	hud.b_suoni.text = "Suoni: " + ("sì" if menu.suoni else "no")
+	hud.b_suoni.visible = rete.web
 	menu.camp_scegli.connect(_continua_camp)
 	menu.camp_togli.connect(_togli_camp)
 	menu.entra_gara.connect(func(c: String, n: String):
@@ -238,6 +241,12 @@ func _comando(cosa: String) -> void:
 				_via(_ultima_conf)
 		"esci":
 			_al_menu()
+		"suoni":
+			menu.suoni = not rete.suoni_attivi()
+			rete.attiva_suoni(menu.suoni)
+			hud.b_suoni.text = "Suoni: " + ("sì" if menu.suoni else "no")
+			if menu.suoni:
+				rete.suono("tocca")
 		"camp_lista":
 			_menu_campionati()
 			menu.campionati_schermo()
@@ -615,32 +624,41 @@ func _mostra(ev: Array) -> void:
 			"dado":
 				var nome := _nome_auto(int(e.auto))
 				rete.suono("dado")
+				if int(e.marcia) >= 5 and int(e.valore) == int(Dati.SFORZO.get(int(e.marcia), -1)):
+					rete.suono("ritorno")
 				await hud.mostra_dado(int(e.marcia), int(e.valore), int(e.faccia), nome, 0.6 / mondo.velocita)
 			"nero":
 				hud.mostra_nero(int(e.valore), str(e.motivo), bool(e.male), str(e.get("testo", "")), _nome_auto(int(e.auto)) if int(e.auto) >= 0 else "")
-				rete.suono("botto" if e.male else "nero")
+				rete.suono("nero")
 				await get_tree().create_timer(0.55 / mondo.velocita).timeout
 			"muovi":
 				mondo.togli_opzioni()
 				mondo.inquadra(e.percorso, 2.5)
-				rete.suono("motore")
+				rete.suono("motore", {"m": int(e.get("m", 3)), "d": mondo.durata_mossa(e.percorso), "fr": int(e.get("fr", 0)),
+					"ol": int(e.get("ol", 0)), "ni": bool(e.get("ni", false))})
 				await mondo.muovi_auto(int(e.auto), e.percorso)
 			"testacoda":
 				rete.suono("gomme")
 				await mondo.testacoda(int(e.auto))
 			"fuori":
-				rete.suono("botto")
+				rete.suono("esplosione")
 				mondo.esplosione(str(mondo.auto_casella.get(int(e.auto), e.get("c", ""))))
 				await mondo.elimina_auto(int(e.auto))
 			"usura":
 				mondo.sbuffo(int(e.auto))
+				var mot := str(e.get("motivo", ""))
+				if mot.contains("detriti") or mot.contains("cordolo"):
+					rete.suono("ghiaia")
 			"urto":
+				rete.suono("scontro", {"forte": bool(e.colpo)})
 				await mondo.urto(int(e.auto), int(e.contro), bool(e.colpo))
 			"arrivo":
 				rete.suono("arrivo")
 				await mondo.arriva_auto(int(e.auto))
 			"segnalino":
 				mondo.metti_danno(str(e.c))
+			"box":
+				rete.suono("box")
 
 func _nome_auto(i: int) -> String:
 	if motore != null:

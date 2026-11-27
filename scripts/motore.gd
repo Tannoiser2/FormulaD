@@ -1206,7 +1206,9 @@ func _muovi(a: Dictionary, cid: String) -> void:
 					break
 	a.c = cid
 	a.ferm = o.fermate
-	eventi.append({"t": "muovi", "auto": a.i, "percorso": o.percorso, "scia": int(o.get("scia", 0))})
+	var exs: Dictionary = o.get("extra", {})
+	eventi.append({"t": "muovi", "auto": a.i, "percorso": o.percorso, "scia": int(o.get("scia", 0)), "m": int(a.marcia),
+		"fr": int(o.freno), "ol": int(o.oltre), "ni": int(exs.get("ni", 0)) + int(exs.get("fg", 0)) + int(exs.get("pk", 0)) > 0})
 	_storia({"a": a.i, "p": o.percorso.duplicate()})
 	if int(o.get("scia", 0)) > 0:
 		_msg("%s prende la scia%s" % [a.nome, "" if o.scia == 1 else " %d volte" % o.scia], "info", a.i)

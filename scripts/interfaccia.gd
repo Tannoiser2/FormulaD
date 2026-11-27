@@ -27,6 +27,7 @@ var _dado3: Dado3D
 var p_sx: PanelContainer
 var col_dx: VBoxContainer
 var b_mappa: Button
+var b_suoni: Button
 var b_cronaca: Button
 var b_scritte: Button
 var titolo_ordine: Label
@@ -76,7 +77,7 @@ func _ready() -> void:
 	barra_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	barra_info.clip_text = true
 	hb.add_child(barra_info)
-	for b in [["Telecamera: segue", "segui"], ["Vista intera", "vista"], ["Caselle", "mappa"], ["Scritte: icone", "scritte"], ["Regole", "regole"], ["Menu", "menu"]]:
+	for b in [["Telecamera: segue", "segui"], ["Vista intera", "vista"], ["Caselle", "mappa"], ["Scritte: icone", "scritte"], ["Suoni: sì", "suoni"], ["Regole", "regole"], ["Menu", "menu"]]:
 		var bt := UI.bottone(b[0], 22, UI.FONDO2, 96, 44)
 		bt.pressed.connect(func(): comando.emit(b[1]))
 		hb.add_child(bt)
@@ -84,6 +85,8 @@ func _ready() -> void:
 			b_mappa = bt
 		if b[1] == "scritte":
 			b_scritte = bt
+		if b[1] == "suoni":
+			b_suoni = bt
 		if b[1] == "segui":
 			b_segui = bt
 			bt.custom_minimum_size.x = 190

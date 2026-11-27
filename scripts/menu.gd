@@ -33,6 +33,7 @@ var kers := false
 var nomi: Array = []     # i nomi scelti per i piloti (vuoto: «Pilota N»)
 var campionato := false
 var camp_piste: Array = []      # i circuiti scelti per il campionato, nell'ordine in cui si corrono
+var suoni := true
 var campionati: Array = []     # i campionati salvati qui: {codice, testo, finito, chi}
 var posti: Array = []        # per pilota: {tipo, uid, nome}
 var codice := ""
@@ -114,6 +115,8 @@ func principale() -> void:
 	altri.alignment = BoxContainer.ALIGNMENT_CENTER
 	vb.add_child(altri)
 	var sec := [["CONTINUA UN CAMPIONATO", "camp_lista", Color(0.45, 0.1, 0.38)]]
+	if in_rete:
+		sec.append(["SUONI: " + ("SÌ" if suoni else "NO"), "suoni", UI.FONDO2])
 	if ha_salvataggio:
 		sec.append(["RIPRENDI LA GARA SALVATA", "riprendi", Color(0.1, 0.55, 0.2)])
 	for x in sec:
@@ -172,6 +175,9 @@ func _voce(cosa: String) -> void:
 			preparazione()
 		"camp_lista":
 			comando.emit("camp_lista")
+		"suoni":
+			comando.emit("suoni")
+			principale()
 		"online":
 			online()
 		"stanza", "stanza_tv", "stanza_online":

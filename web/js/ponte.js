@@ -1,7 +1,7 @@
 // Ponte tra il gioco (Godot, versione web) e il resto: stanza su Firebase, telefoni, ospiti, salvataggi, suoni, QR code.
 // Godot lo usa con JavaScriptBridge.get_interface("FR"). Tutto passa come testo JSON.
 import { creaRete, nuovoCodice, RADICE, spezza, unisci } from './rete.js';
-import { suona } from './suoni.js';
+import { suona, attivaSuoni, suoniAttivi, registra } from './suoni.js';
 
 const coda = [];
 const q = new URLSearchParams(location.search);
@@ -102,7 +102,10 @@ window.FR = {
   // copia del salvataggio dentro la stanza (solo chi ospita la può scrivere)
   salvaStanza(v) { if (rete && codice && !ospite) rete.set(`${RADICE}/${codice}/labels`, v ? spezza(v) : null).catch((e) => console.warn(e)); },
   azione(k, p) { if (rete && codice) rete.push(`${RADICE}/${codice}/acts`, { s: rete.uid, k, v: p }).catch?.((e) => console.warn(e)); },
-  suono(n) { suona(n); },
+  suono(n, j) { let o = {}; try { o = j ? JSON.parse(j) : {}; } catch (e) { /* ok */ } suona(n, o); },
+  attivaSuoni(si) { attivaSuoni(si); },
+  suoniAttivi() { return suoniAttivi(); },
+  registraSuoni(seq, d) { return registra(seq, d); },
   schermoIntero() {
     const d = document.documentElement;
     try {

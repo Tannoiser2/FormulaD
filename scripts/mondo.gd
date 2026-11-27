@@ -221,6 +221,12 @@ func metti_auto(i: int, pilota: int, nome: String, cid: String) -> void:
 		n.scale = Vector3.ONE
 	auto_casella[i] = cid
 
+## Quanto dura l'animazione di una mossa (per il rombo del motore).
+func durata_mossa(percorso: Array) -> float:
+	if percorso.size() < 2:
+		return 0.3
+	return clamp(1.4 / percorso.size(), 0.05, 0.16) / velocita * percorso.size()
+
 func muovi_auto(i: int, percorso: Array) -> void:
 	if not auto.has(i) or percorso.size() < 2:
 		return
