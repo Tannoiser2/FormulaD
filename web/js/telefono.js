@@ -38,6 +38,7 @@ for (const k of ['gomme', 'freni', 'cambio', 'carrozzeria', 'motore', 'tenuta', 
   ICONE[k] = im;
 }
 let stato = null;
+let scheda = '';         // la scheda a parte sopra il gioco: '' chiusa, 'ordine' o 'cronaca'
 let scelta = null;       // opzione di mossa toccata
 let inviata = -1;        // numero dello stato a cui ho già risposto
 let toccavaAMe = false;
@@ -271,9 +272,11 @@ function disegna() {
 
   const prep = tocca && (att.tipo === 'assetto' || att.tipo === 'qualifica' || att.tipo === 'qritira');
   app.innerHTML = `<div class="gioco ${prep ? 'prep' : ''}">
-    <div class="ordine">${ordine(io)}</div>
+    <div class="ordine">${ordine(io)}<button class="bsch bsch2" data-sch="ordine">Ordine e cronaca</button></div>
     <div class="cruscotto ${tocca ? 'tocca' : ''}">${mia && !prep ? '<canvas id="plancia"></canvas>' : ''}${testa}<div class="azione">${az}</div></div>
-    <div class="pista"><canvas id="mappa"></canvas><button id="centra" class="centra">Centra</button></div></div>`;
+    <div class="pista"><canvas id="mappa"></canvas><button id="centra" class="centra">Centra</button><button class="bsch" data-sch="ordine">Ordine e cronaca</button></div></div>`;
+  app.querySelectorAll('.bsch').forEach((b) => { b.onclick = () => { scheda = scheda || 'ordine'; disegnaScheda(); }; });
+  disegnaScheda();
   app.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { assPf[b.dataset.z] += Number(b.dataset.d); disegna(); }; });
   app.querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => { assG = b.dataset.g; disegna(); }; });
   app.querySelectorAll('[data-qm]').forEach((b) => { b.onclick = () => manda({ t: 'qualifica', m: Number(b.dataset.qm) }); });
@@ -331,6 +334,37 @@ function qualifica(att) {
     <p class="sotto">Finora ${att.fatto} punti${att.meglio ? `, il migliore ne ha ${att.meglio}` : ''}. Oltre il limite di 1-4: limite meno 2 a casella; di 5 o più: testacoda.</p><div class="gomme qmarce">`;
   for (const o of att.marce) h += `<button data-qm="${o.m}">${MARCE[o.m]} (${o.min}-${o.max}): media ${String(o.media).replace('.', ',')}${o.tc ? `<br>testacoda ${o.tc}%` : ''}</button>`;
   return h + '</div>';
+}
+
+// La scheda a parte: l'ordine di gioco completo e la cronaca della gara, a tutto schermo, da aprire e chiudere a piacere.
+function disegnaScheda() {
+  let el = document.getElementById('scheda');
+  if (!scheda || !stato || stato.fase === 'attesa') { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'scheda';
+    el.innerHTML = '<div class="sch-testa"><button data-t="ordine">Ordine di gioco</button><button data-t="cronaca">Cronaca</button><button data-t="">Chiudi</button></div><div class="sch-corpo"></div>';
+    document.body.appendChild(el);
+    el.querySelectorAll('button').forEach((b) => { b.onclick = () => { scheda = b.dataset.t; if (scheda) { const c = el.querySelector('.sch-corpo'); c.scrollTop = 0; } disegnaScheda(); }; });
+  }
+  el.querySelectorAll('.sch-testa button').forEach((b) => b.classList.toggle('su', b.dataset.t === scheda));
+  const corpo = el.querySelector('.sch-corpo');
+  const alto = corpo.scrollTop;
+  const io = stato.auto.findIndex((a) => a.u === uid);
+  if (scheda === 'ordine') {
+    const att = stato.att;
+    corpo.innerHTML = stato.ordine.map((i, k) => {
+      const a = stato.auto[i];
+      const fuori = a.pa > 0 || a.f;
+      const stt = a.pa > 0 ? `arrivato ${a.pa}°` : a.f ? 'ritirato' : `giro ${Math.max(1, Math.min(a.g, stato.giri))} di ${stato.giri}`;
+      return `<div class="riga ${att && att.auto === i ? 'turno' : ''} ${i === io ? 'io' : ''} ${fuori ? 'via' : ''}"><span class="p">${k + 1}</span><span class="col" style="background:${colore(a.p)}"></span>
+        <span class="n">${esc(a.n)}</span><span class="p">${stt}</span><span class="m" style="background:${COL_MARCE[a.m]};color:${a.m === 1 ? '#111' : '#fff'}">${a.m > 0 ? MARCE[a.m] : '-'}</span></div>`;
+    }).join('');
+  } else {
+    const cr = (stato.cr || stato.log || []).slice().reverse();
+    corpo.innerHTML = `<div class="log">${cr.length ? cr.map((t) => `<div>${esc(t)}</div>`).join('') : '<div>Ancora niente da raccontare.</div>'}</div>`;
+  }
+  corpo.scrollTop = alto;
 }
 
 function ordine(io) {

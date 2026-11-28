@@ -115,3 +115,17 @@ body.gara #app { max-width: none; height: 100%; display: block; }
 .azione button.piccolo { min-height: 34px; font-size: 15px; background: #2b3242; margin-top: 6px; padding: 4px 10px; width: auto; }
 .gomme.qmarce { display: grid; grid-template-columns: 1fr 1fr; }
 .azione .gomme.qmarce button { font-size: 15px; min-height: 46px; line-height: 1.15; }
+
+/* scheda a parte: ordine di gioco completo e cronaca */
+.bsch { position: absolute; top: 6px; left: 6px; width: auto; min-height: 0; margin: 0; font-size: 15px; padding: 4px 12px; opacity: .92; z-index: 2; background: #2b3242; }
+.bsch2 { position: static; display: none; flex: 0 0 auto; }
+.gioco.prep .bsch2 { display: inline-block; }
+#scheda { position: fixed; inset: 0; z-index: 50; background: rgba(8, 10, 14, .97); display: flex; flex-direction: column; gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 8px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 8px); }
+#scheda .sch-testa { display: flex; gap: 6px; flex: 0 0 auto; }
+#scheda .sch-testa button { flex: 1 1 0; min-height: 44px; font-size: 18px; margin: 0; padding: 4px 8px; background: #2b3242; }
+#scheda .sch-testa button.su { background: #d61f1f; }
+#scheda .sch-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#scheda .riga.via { opacity: .55; }
+#scheda .riga { font-size: 22px; padding: 6px 8px; }
+#scheda .log { font-size: 19px; }

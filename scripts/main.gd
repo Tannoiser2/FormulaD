@@ -12,6 +12,7 @@ var livello := 1
 var _gira := false
 var _seq := 0
 var _log: Array = []
+var _cr: Array = []            # la cronaca intera della gara (ultime righe), per la scheda sui telefoni
 var _coda_ospite: Array = []
 var _ospite_gira := false
 var _ultimo_n := -1
@@ -253,6 +254,14 @@ func _comando(cosa: String) -> void:
 		"camp_prossimo":
 			hud.chiudi_velo()
 			_gp()
+		"camp_via":
+			var sala := {}
+			for i in menu.posti.size():
+				sala[i] = menu.posti[i]
+			menu.camp_gp = {}
+			var conf := _conf_gp_rete(sala)
+			_salva_campionato()
+			_via(conf)
 		"apri_stanza":
 			_stanza_chiesta = true
 			rete.avvia()
@@ -275,7 +284,8 @@ func _solo_velo() -> void:
 	menu.visible = false
 	await hud.velo.tree_exited
 	for c in hud._pannelli:
-		c.visible = c != hud.p_dado and c != hud.p_qr and c != hud.p_ass
+		c.visible = c != hud.p_dado and c != hud.p_qr and c != hud.p_ass and c != hud.p_barra
+	hud.imposta_tavolo(hud.tavolo)
 	if modo == "menu":
 		hud.visible = false
 		menu.visible = true
@@ -284,6 +294,8 @@ func _solo_velo() -> void:
 
 func _al_menu() -> void:
 	hud.nascondi_qr()
+	menu.camp_gp = {}
+	_connessi.clear()
 	if editor.visible:
 		editor.chiudi()
 	if modo == "stanza" or modo == "ospite":
@@ -426,8 +438,72 @@ func _gp() -> void:
 	if camp.is_empty() or camp.finito:
 		_al_menu()
 		return
-	_via(Campionato.conf_gp(camp))
+	var remoti: Array = camp.auto.filter(func(a): return str(a.get("tipo", "")) == "remoto")
+	if not remoti.is_empty():
+		# con i telefoni (o online): si parte subito se sono tutti collegati, se no la sala d'attesa del GP
+		var tutti := rete.codice != ""
+		for a in remoti:
+			if not _connessi.has(str(a.uid)):
+				tutti = false
+		if not tutti:
+			_sala_gp()
+			return
+		_via(_conf_gp_rete({}))
+	else:
+		_via(Campionato.conf_gp(camp))
 	hud.cronaca("Campionato: Gran Premio %d di %d, %s" % [int(camp.gp) + 1, camp.piste.size(), Campionato.nome_pista(camp.piste[int(camp.gp)])], "giro")
+
+var _connessi := {}   # uid dei telefoni / ospiti collegati adesso alla stanza
+
+## La configurazione del GP con i giocatori collegati: posti è la sala (vuoto: tutti come nel campionato).
+## Chi non è collegato lascia l'auto al computer per questo GP.
+func _conf_gp_rete(posti: Dictionary) -> Dictionary:
+	var conf := Campionato.conf_gp(camp)
+	conf.stanza = true
+	for d in conf.auto:
+		var k := int(d.pilota)
+		if posti.has(k):
+			var pz: Dictionary = posti[k]
+			d.tipo = str(pz.tipo)
+			d.uid = str(pz.uid) if pz.tipo == "remoto" else ""
+			# il telefono nuovo resta legato al pilota anche per i prossimi GP
+			for a in camp.auto:
+				if int(a.pilota) == k and str(a.get("tipo", "")) == "remoto" and pz.tipo == "remoto" and str(pz.uid) != "":
+					a.uid = str(pz.uid)
+		if str(d.tipo) == "remoto" and not _connessi.has(str(d.uid)):
+			d.tipo = "ia"
+			d.uid = ""
+	camp["stanza_cod"] = rete.codice
+	return conf
+
+## La sala d'attesa di un GP del campionato: si riapre la stanza (con lo stesso codice, se si può) e si
+## aspettano i telefoni.
+func _sala_gp() -> void:
+	hud.nascondi_qr()
+	hud.chiudi_velo()
+	hud.visible = false
+	motore = null
+	modo = "menu"
+	menu.visible = true
+	menu.campionato = false
+	menu.stanza = true
+	menu.tipo_stanza = str(camp.get("tipo_stanza", "tv"))
+	menu.posti = []
+	for i in Dati.PILOTI.size():
+		menu.posti.append({"tipo": "chiuso", "uid": "", "nome": ""})
+	for a in camp.auto:
+		var t := str(a.get("tipo", "ia"))
+		menu.posti[int(a.pilota)] = {"tipo": t, "uid": str(a.get("uid", "")), "nome": str(a.nome), "pilota_n": str(a.nome),
+			"orig": t, "dentro": t == "remoto" and _connessi.has(str(a.get("uid", "")))}
+	menu.camp_gp = {"gp": int(camp.gp), "n": camp.piste.size(), "pista": Campionato.nome_pista(camp.piste[int(camp.gp)])}
+	if rete.codice == "":
+		menu.codice = ""
+		_stanza_chiesta = true
+		rete.avvia(str(camp.get("stanza_cod", "")))
+	else:
+		menu.imposta_stanza(rete.codice, rete.url, _qr(rete.url))
+	menu.preparazione()
+	_pubblica_attesa()
 
 ## A gara finita: se è un GP del campionato si aggiornano le classifiche (una volta sola).
 func _esperienza() -> Dictionary:
@@ -471,6 +547,7 @@ func _via(conf: Dictionary) -> void:
 	_ciclo()
 
 func _apri_gara() -> void:
+	hud.imposta_tavolo(modo == "stanza" and menu.tipo_stanza == "tv" and _miei().is_empty())
 	menu.visible = false
 	hud.visible = true
 	_qr_in_gara()
@@ -480,6 +557,7 @@ func _apri_gara() -> void:
 	for c in hud.cronaca_box.get_children():
 		c.queue_free()
 	_log.clear()
+	_cr.clear()
 	mondo.carica_pista(motore.pista)
 	for a in motore.s.auto:
 		mondo.metti_auto(a.i, a.pilota, a.nome, a.c)
@@ -520,12 +598,13 @@ func _ciclo() -> void:
 				hud.mostra_fine()
 			break
 		var a: Dictionary = m.s.auto[m.s.attesa.auto]
+		var curva := _casella_curva(m, a)
 		if m.s.attesa.tipo == "mossa" and (a.tipo != "ia" or mondo.velocita < 3.0):
-			mondo.mostra_opzioni(vista.att.opz, a.c)
+			mondo.mostra_opzioni(vista.att.opz, a.c, true, curva)
 		else:
 			mondo.togli_opzioni()
 			if a.c != "":
-				mondo.inquadra([a.c], 3.5)
+				mondo.inquadra([a.c] + curva, 3.5)
 		mondo.evidenzia_auto(a.i)
 		hud.chiedi()
 		if a.tipo == "ia" or auto_prova:
@@ -542,6 +621,15 @@ func _ciclo() -> void:
 		break
 	_gira = false
 	_prova_azioni()
+
+## Tocca a un giocatore: oltre alla sua casella la telecamera inquadra, se non è troppo lontana, la prossima curva.
+func _casella_curva(m: Motore, a: Dictionary) -> Array:
+	if a.tipo == "ia" or a.c == "" or not m.pista.per_id.has(a.c) or bool(a.get("fuori", false)):
+		return []
+	var pc := m.pista.prossima_curva(str(a.c))
+	if int(pc[0]) < 0 or int(pc[0]) > 14:
+		return []
+	return [str(pc[2])]
 
 ## Le mosse arrivate dai telefoni e dagli ospiti: possono arrivare mentre lo schermo sta ancora mostrando
 ## i movimenti, quindi aspettano in coda. Ognuna dice a quale stato risponde: quelle vecchie si scartano.
@@ -730,6 +818,11 @@ func _pubblica(vista: Dictionary, ev: Array) -> void:
 	d["ev"] = leggeri
 	d["n"] = _seq
 	d["log"] = testi.slice(max(0, testi.size() - 6))
+	var cr := _cr.duplicate()
+	for e in ev:
+		if e.t == "msg":
+			cr.append(e.testo)
+	d["cr"] = cr.slice(max(0, cr.size() - 30))
 	d["vel"] = mondo.velocita
 	d["iw"] = int(motore.pista.img.x)
 	# dove stanno le auto, in pixel del tabellone (per la mappa sui telefoni)
@@ -778,6 +871,7 @@ func _evento_rete(e: Dictionary) -> void:
 		"entra":
 			var uid := str(e.uid)
 			var nome := str(e.get("nome", "Pilota")).left(16)
+			_connessi[uid] = true
 			if modo == "menu" and menu.stanza:
 				menu.entra_giocatore(uid, nome)
 				menu.preparazione()
@@ -797,6 +891,7 @@ func _evento_rete(e: Dictionary) -> void:
 						hud.cronaca("%s è di nuovo collegato" % a.nome, "info")
 				_pubblica(motore.vista(), [])
 		"esce":
+			_connessi.erase(str(e.uid))
 			if modo == "menu" and menu.stanza:
 				menu.esce_giocatore(str(e.uid))
 				menu.preparazione()

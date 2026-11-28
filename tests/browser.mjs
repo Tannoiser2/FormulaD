@@ -83,6 +83,7 @@ if (OSPITE) {
 const t0 = Date.now();
 let fotoAssetto = false;
 let fotoQual = false;
+let fotoBarra = false;
 let fatte = 0, fotoMarcia = false, fotoMossa = false, fotoOspite = 0, fine = false, fotoAnte = 0;
 while (Date.now() - t0 < DURATA && !fine) {
   await tv.waitForTimeout(700);
@@ -119,6 +120,24 @@ while (Date.now() - t0 < DURATA && !fine) {
       if (fatte > 2 && fotoAnte < 4) { await foto(p, `tel_2_anteprima_${i}_${fotoAnte}`); if (!fotoAnte) await foto(tv, 'tv_3b_anteprima_telefono'); fotoAnte++; }
       await p.mouse.click(pt.x, pt.y);
       fatte++;
+      if (fatte > 6 && !fotoBarra) {
+        fotoBarra = true;
+        await tv.waitForTimeout(1100);
+        await foto(tv, 'tv_5_barra_dadi');
+        // la scheda con ordine e cronaca sul telefono
+        if (await p.locator('.pista .bsch').count()) {
+          await p.click('.pista .bsch');
+          await p.waitForTimeout(300);
+          await foto(p, 'tel_6_scheda_ordine');
+          await p.click('#scheda [data-t="cronaca"]');
+          await p.waitForTimeout(300);
+          await foto(p, 'tel_6_scheda_cronaca');
+          const righe = await p.locator('#scheda .log div').count();
+          console.log('righe di cronaca nella scheda:', righe);
+          await p.click('#scheda [data-t=""]');
+          console.log('scheda chiusa:', (await p.locator('#scheda').count()) === 0);
+        }
+      }
     } else {
       // la casella più lontana tra quelle che non costano nulla; se non ce n'è, la meno cara
       const costo = (o) => (o.fu ? 1000 : 0) + (o.te ? 50 : 0) + Object.values(o.u || {}).reduce((a, b) => a + b, 0) * 10 - o.mo;

@@ -20,6 +20,10 @@ var plancia_info: Label
 var plancia: Plancia
 var plancia_nome: Label
 var p_dado: PanelContainer
+var tavolo := false             # la TV fa da tavolo: i piloti guardano il cellulare, niente colonna a destra
+var p_barra: PanelContainer     # in modo tavolo: la barra dei dadi in basso, che appare solo quando serve
+var hb_barra: HBoxContainer
+var _barra_tk := 0
 var dadi_area: Control          # la striscia dove il dado entra da destra e rotola fino a sinistra
 var dadi_neri: HBoxContainer    # i dadi neri, piccoli, accanto al dado della marcia
 var dadi_testo: Label           # sotto i dadi: che cosa è uscito
@@ -201,7 +205,20 @@ func _ready() -> void:
 	add_child(p_ass)
 	ass_box = UI.colonna(8)
 	p_ass.add_child(ass_box)
-	_pannelli = [barra, p_ass, p_sx, p_cron, p_azione, p_plancia, p_dado]
+	# la barra dei dadi (solo modo tavolo): in basso al centro, appare quando si tira
+	p_barra = UI.pannello(UI.FONDO, UI.ROSSO, 14, 3, 10)
+	p_barra.anchor_left = 0.5
+	p_barra.anchor_right = 0.5
+	p_barra.anchor_top = 1
+	p_barra.anchor_bottom = 1
+	p_barra.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	p_barra.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	p_barra.offset_bottom = -14
+	p_barra.visible = false
+	add_child(p_barra)
+	hb_barra = UI.riga(18)
+	p_barra.add_child(hb_barra)
+	_pannelli = [barra, p_ass, p_sx, p_cron, p_azione, p_plancia, p_dado, p_barra]
 
 ## Vero se il punto è sopra un pannello: lì i tocchi non devono muovere il tabellone.
 ## Il QR code della stanza TV + telefoni in basso a sinistra, per rientrare se un telefono perde la gara.
@@ -249,11 +266,48 @@ func nascondi_qr() -> void:
 	if p_qr != null:
 		p_qr.visible = false
 
+## Modo tavolo (TV + telefoni, nessun pilota davanti allo schermo): via la colonna a destra e la cronaca,
+## i dadi passano nella barra in basso. Il cruscotto, l'ordine e la cronaca stanno sui telefoni.
+func imposta_tavolo(si: bool) -> void:
+	tavolo = si
+	col_dx.visible = not si
+	p_cron.visible = not si
+	var dest: Control = hb_barra if si else p_dado.get_child(0)
+	for c in [dadi_area, dadi_testo]:
+		if c.get_parent() != dest:
+			c.reparent(dest, false)
+	if si:
+		dadi_area.custom_minimum_size = Vector2(460, 96)
+		dadi_testo.custom_minimum_size = Vector2(660, 70)
+		dadi_testo.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		dadi_testo.max_lines_visible = 3
+		dadi_testo.add_theme_font_size_override("font_size", 27)
+		dadi_testo.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	else:
+		dadi_area.custom_minimum_size = Vector2(LARG_DX - 40, 96)
+		dadi_testo.custom_minimum_size = Vector2(LARG_DX - 40, 44)
+		dadi_testo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		dadi_testo.max_lines_visible = 2
+		dadi_testo.add_theme_font_size_override("font_size", 18)
+		dadi_testo.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	p_barra.visible = false
+
+## La barra dei dadi compare quando si tira e sparisce da sola qualche secondo dopo l'ultimo tiro.
+func _barra_su() -> void:
+	if not tavolo:
+		return
+	_barra_tk += 1
+	p_barra.visible = true
+	var mio := _barra_tk
+	await get_tree().create_timer(4.5).timeout
+	if mio == _barra_tk and tavolo:
+		p_barra.visible = false
+
 func sopra(p: Vector2) -> bool:
 	if velo != null and is_instance_valid(velo):
 		return true
 	for c in _pannelli:
-		if c.visible and c.get_global_rect().has_point(p):
+		if c.is_visible_in_tree() and c.get_global_rect().has_point(p):
 			return true
 	return false
 
@@ -282,6 +336,8 @@ func aggiorna(vista: Dictionary, mie: Array) -> void:
 		info = "%s  -  settori %d / %d / %d" % [Qualifiche.nome_sessione(q), int(q.limiti[0]), int(q.limiti[1]), int(q.limiti[2])]
 	if not campionato.is_empty() and v.has("camp"):
 		info = "GP %d di %d  -  " % [int(v.camp) + 1, campionato.piste.size()] + info
+	if tavolo and v.att != null and str(v.fase) != "fine":
+		info = "Tocca a %s  -  " % str(v.auto[int(v.att.auto)].n) + info
 	barra_info.text = info
 	if str(v.fase) == "qualifiche":
 		_classifica_qualifiche()
@@ -423,12 +479,13 @@ func _taglia_cronaca() -> void:
 ## Il dado della marcia entra nel riquadro da destra e rotola fino a sinistra, fermandosi sul numero uscito.
 func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 0.6) -> void:
 	# i dadi neri dello stesso turno (la partenza) restano, spostati a destra del dado della marcia
+	_barra_su()
 	if is_instance_valid(_dado3):
 		_dado3.queue_free()
 	dadi_neri.position.x = 108.0
 	_dado3 = Dado3D.new(96)
 	dadi_area.add_child(_dado3)
-	var largo: float = max(dadi_area.size.x, LARG_DX - 40)
+	var largo: float = max(dadi_area.size.x, dadi_area.custom_minimum_size.x)
 	dadi_testo.text = "%s in %s: %d" % [Dati.corto(nome), Dati.NOMI_MARCE[marcia], valore]
 	dadi_testo.add_theme_color_override("font_color", UI.CHIARO)
 	if durata <= 0.0:
@@ -445,6 +502,7 @@ func mostra_dado(marcia: int, valore: int, faccia: int, nome: String, durata := 
 
 ## Un dado nero: un quadratino accanto al dado della marcia; sotto, che cosa ha deciso.
 func mostra_nero(valore: int, motivo: String, male: bool, testo := "", nome := "") -> void:
+	_barra_su()
 	dadi_neri.position.x = 108.0 if is_instance_valid(_dado3) and _dado3 != null else 0.0
 	while dadi_neri.get_child_count() >= 6:
 		var vecchio := dadi_neri.get_child(0)
@@ -469,6 +527,9 @@ func pulisci_dadi() -> void:
 		dadi_neri.remove_child(c)
 		c.queue_free()
 	dadi_testo.text = ""
+	_barra_tk += 1
+	if p_barra != null:
+		p_barra.visible = false
 
 # ------------------------------------------------------------------ decisioni
 

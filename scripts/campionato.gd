@@ -16,7 +16,8 @@ static func nuovo(conf: Dictionary, esp := {}) -> Dictionary:
 	var c := {"piste": conf.campionato.piste.duplicate(), "gp": 0, "regole": conf.regole, "giri": int(conf.giri),
 		"livello": int(conf.get("livello", 1)), "opzioni": conf.get("opzioni", {}).duplicate(), "auto": conf.auto.duplicate(true),
 		"punti": {}, "vill": {}, "prov": {}, "vittorie": {}, "gare": [], "finito": false,
-		"perm": {}, "pmec": {}, "assenti": {}, "punti_sc": {}}
+		"perm": {}, "pmec": {}, "assenti": {}, "punti_sc": {},
+		"stanza": bool(conf.get("stanza", false)), "tipo_stanza": str(conf.get("tipo_stanza", "tv"))}
 	c.opzioni["qualifiche"] = true
 	c.opzioni["strada"] = false
 	if c.opzioni.get("lari", false):

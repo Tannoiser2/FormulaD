@@ -397,7 +397,7 @@ static func opzione_extra(o: Dictionary) -> bool:
 
 ## lista: le opzioni come nella vista ({c, x, y, u, fu, te, bx, fi, ...}): ogni casella raggiungibile si colora
 ## per intero, con scritto sopra che cosa costa; un bordo azzurro segna le caselle in più facoltative.
-func mostra_opzioni(lista: Array, da: String, inquadrale := true) -> void:
+func mostra_opzioni(lista: Array, da: String, inquadrale := true, ancora: Array = []) -> void:
 	togli_opzioni()
 	_ultime = [lista, da]
 	var lungo: float = pista.cella * SCALA * 0.92
@@ -431,7 +431,7 @@ func mostra_opzioni(lista: Array, da: String, inquadrale := true) -> void:
 			radice.set_meta("righe", nodi)
 		punti.append(cid)
 	if not lista.is_empty() and inquadrale:
-		inquadra(punti)
+		inquadra(punti + ancora)
 
 var _ultime: Array = []
 

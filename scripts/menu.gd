@@ -34,6 +34,7 @@ var nomi: Array = []     # i nomi scelti per i piloti (vuoto: «Pilota N»)
 var campionato := false
 var camp_piste: Array = []      # i circuiti scelti per il campionato, nell'ordine in cui si corrono
 var suoni := true
+var camp_gp: Dictionary = {}   # sala d'attesa di un GP del campionato con telefoni o online (vuoto: preparazione normale)
 var campionati: Array = []     # i campionati salvati qui: {codice, testo, finito, chi}
 var posti: Array = []        # per pilota: {tipo, uid, nome}
 var codice := ""
@@ -378,6 +379,9 @@ func _scelta(etichetta: String, valori: Array, attuale, quando: Callable) -> HBo
 	return h
 
 func preparazione() -> void:
+	if not camp_gp.is_empty():
+		sala_gp()
+		return
 	var vb := _nuovo_corpo()
 	var t := UI.testo("CAMPIONATO" if campionato else "PREPARA LA GARA" if not stanza else ("TV + TELEFONI" if tipo_stanza == "tv" else "GARA ONLINE"), 60, UI.ROSSO, true)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -392,6 +396,20 @@ func preparazione() -> void:
 	ps.add_child(vs)
 	if campionato:
 		_scegli_circuiti(vs)
+		if in_rete:
+			var gioc := "tv" if stanza and tipo_stanza == "tv" else ("online" if stanza else "schermo")
+			vs.add_child(_scelta("Giocatori", [["Qui", "schermo"], ["Telefoni", "tv"], ["Online", "online"]], gioc, func(x):
+				if x == gioc:
+					return
+				if stanza:
+					comando.emit("chiudi_stanza")
+				stanza = x != "schermo"
+				tipo_stanza = "online" if x == "online" else "tv"
+				codice = ""
+				_posti_iniziali()
+				preparazione()
+				if stanza:
+					comando.emit("apri_stanza")))
 	else:
 		_scegli_pista(vs)
 	vs.add_child(_scelta("Giri", [["1", 1], ["2", 2], ["3", 3]], giri, func(x):
@@ -466,32 +484,8 @@ func preparazione() -> void:
 	elif regole == "avanzate" and (meteo or libero):
 		nota = ("Il dado nero decide il tempo e si scelgono le gomme. " if meteo else "") + ("Ognuno ripartisce 20 punti fra le zone." if libero else "")
 	vs.add_child(UI.testo(nota, 20, UI.GRIGIO, false, 520))
-	if stanza:
-		var hq := UI.riga(14)
-		vs.add_child(hq)
-		if qr_tex != null and codice != "" and tipo_stanza == "tv":
-			var q := TextureRect.new()
-			q.texture = qr_tex
-			q.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			q.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			q.custom_minimum_size = Vector2(190, 190)
-			hq.add_child(q)
-		var vq := UI.colonna(2)
-		hq.add_child(vq)
-		if codice == "":
-			vq.add_child(UI.testo("Apro la stanza..." if avviso == "" else avviso, 28, UI.GIALLO, false, 480))
-		else:
-			vq.add_child(UI.testo("CODICE STANZA" if tipo_stanza == "tv" else "CODICE DELLA GARA", 22, UI.GRIGIO))
-			vq.add_child(UI.testo(codice, 80, UI.GIALLO, true))
-			if tipo_stanza == "tv":
-				vq.add_child(UI.testo("Ogni pilota inquadra il QR con il telefono (o apre la pagina del telefono e scrive il codice).", 20, UI.CHIARO, false, 300))
-			else:
-				vq.add_child(UI.testo("Gli altri aprono il gioco sul loro computer, scelgono «Gara online», «Entra in una gara» e scrivono il codice, oppure aprono il link.", 20, UI.CHIARO, false, 480))
-				var bl := UI.bottone("Copia il link della gara", 20, UI.FONDO2, 260, 40)
-				bl.pressed.connect(func():
-					DisplayServer.clipboard_set(link_gara())
-					bl.text = "Link copiato")
-				vq.add_child(bl)
+	if stanza and not campionato:
+		_blocco_stanza(vs)
 	# colonna di destra: i piloti
 	var pd := UI.pannello()
 	h.add_child(pd)
@@ -505,6 +499,8 @@ func preparazione() -> void:
 	vd.add_child(g)
 	for i in Dati.PILOTI.size():
 		g.add_child(_carta_pilota(i))
+	if stanza and campionato:
+		_blocco_stanza(vd)
 	# in fondo
 	var hb := UI.riga(20)
 	hb.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -520,6 +516,112 @@ func preparazione() -> void:
 	bv.disabled = n < 1 or (stanza and codice == "") or (campionato and (camp_piste.is_empty() or n < 2))
 	bv.pressed.connect(_via)
 	hb.add_child(bv)
+
+## Prima di un GP del campionato con telefoni o online: i piloti del campionato, chi è collegato, il QR.
+## Chi non c'è può guidare da questo schermo o lasciare l'auto al computer per questo GP.
+func sala_gp() -> void:
+	var vb := _nuovo_corpo()
+	var t := UI.testo("CAMPIONATO  -  GRAN PREMIO %d DI %d" % [int(camp_gp.gp) + 1, int(camp_gp.n)], 56, UI.ROSSO, true)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(t)
+	var st := UI.testo(str(camp_gp.pista), 34, UI.CHIARO, true)
+	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vb.add_child(st)
+	var h := UI.riga(24)
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(h)
+	var pl := UI.pannello()
+	pl.custom_minimum_size = Vector2(820, 0)
+	h.add_child(pl)
+	var vl := UI.colonna(8)
+	pl.add_child(vl)
+	vl.add_child(UI.testo("I PILOTI  -  i telefoni si ricollegano da soli; chi entra con un altro telefono scrive il nome del suo pilota", 22, UI.GIALLO, false, 780))
+	for i in posti.size():
+		var pz: Dictionary = posti[i]
+		if pz.tipo == "chiuso":
+			continue
+		var r := UI.riga(12)
+		vl.add_child(r)
+		var col := UI.pannello(Dati.colore_auto(i), Dati.colore_auto(i), 4, 0, 0)
+		col.custom_minimum_size = Vector2(14, 44)
+		r.add_child(col)
+		var ln := UI.testo(str(pz.get("pilota_n", "")), 26, UI.CHIARO, true)
+		ln.custom_minimum_size.x = 260
+		ln.clip_text = true
+		r.add_child(ln)
+		var stato := ""
+		var cst := UI.GRIGIO
+		match str(pz.tipo):
+			"remoto":
+				stato = "collegato" if pz.get("dentro", false) else "in attesa del telefono..."
+				cst = Color(0.4, 0.9, 0.45) if pz.get("dentro", false) else UI.GIALLO
+			"umano":
+				stato = "su questo schermo"
+			"ia":
+				stato = "il computer"
+		var ls := UI.testo(stato, 22, cst)
+		ls.custom_minimum_size.x = 260
+		r.add_child(ls)
+		if str(pz.get("orig", "")) == "remoto":
+			var ii := i
+			var bt := UI.bottone({"remoto": "Lascia al computer", "ia": "Da questo schermo", "umano": "Torna al telefono"}[str(pz.tipo)], 20, UI.FONDO2, 210, 44)
+			bt.pressed.connect(func():
+				var p2: Dictionary = posti[ii]
+				p2.tipo = {"remoto": "ia", "ia": "umano", "umano": "remoto"}[str(p2.tipo)]
+				comando.emit("posti")
+				sala_gp())
+			r.add_child(bt)
+	var pr := UI.pannello()
+	pr.custom_minimum_size = Vector2(560, 0)
+	h.add_child(pr)
+	var vr := UI.colonna(8)
+	pr.add_child(vr)
+	_blocco_stanza(vr)
+	var hb := UI.riga(20)
+	hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(hb)
+	var bi := UI.bottone("MENU", 32, UI.FONDO2, 220, 64)
+	bi.pressed.connect(func():
+		camp_gp = {}
+		comando.emit("chiudi_stanza")
+		principale())
+	hb.add_child(bi)
+	var mancano := 0
+	for pz in posti:
+		if pz.tipo == "remoto" and not pz.get("dentro", false):
+			mancano += 1
+	var bv := UI.bottone("VIA AL GRAN PREMIO!" if mancano == 0 else "VIA (%d in attesa: guida il computer)" % mancano, 34, Color(0.1, 0.6, 0.2), 560, 64)
+	bv.disabled = codice == ""
+	bv.pressed.connect(func(): comando.emit("camp_via"))
+	hb.add_child(bv)
+
+## Il codice della stanza e il QR per i telefoni (o il link per la gara online).
+func _blocco_stanza(dove: VBoxContainer) -> void:
+	var hq := UI.riga(14)
+	dove.add_child(hq)
+	if qr_tex != null and codice != "" and tipo_stanza == "tv":
+		var q := TextureRect.new()
+		q.texture = qr_tex
+		q.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		q.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		q.custom_minimum_size = Vector2(190, 190)
+		hq.add_child(q)
+	var vq := UI.colonna(2)
+	hq.add_child(vq)
+	if codice == "":
+		vq.add_child(UI.testo("Apro la stanza..." if avviso == "" else avviso, 28, UI.GIALLO, false, 480))
+	else:
+		vq.add_child(UI.testo("CODICE STANZA" if tipo_stanza == "tv" else "CODICE DELLA GARA", 22, UI.GRIGIO))
+		vq.add_child(UI.testo(codice, 80, UI.GIALLO, true))
+		if tipo_stanza == "tv":
+			vq.add_child(UI.testo("Ogni pilota inquadra il QR con il telefono (o apre la pagina del telefono e scrive il codice).", 20, UI.CHIARO, false, 300))
+		else:
+			vq.add_child(UI.testo("Gli altri aprono il gioco sul loro computer, scelgono «Gara online», «Entra in una gara» e scrivono il codice, oppure aprono il link.", 20, UI.CHIARO, false, 480))
+			var bl := UI.bottone("Copia il link della gara", 20, UI.FONDO2, 260, 40)
+			bl.pressed.connect(func():
+				DisplayServer.clipboard_set(link_gara())
+				bl.text = "Link copiato")
+			vq.add_child(bl)
 
 func _scegli_pista(vs: VBoxContainer) -> void:
 	var pid: String = Dati.PISTE[pista_n]
@@ -666,20 +768,38 @@ func link_gara() -> String:
 func entra_giocatore(uid: String, nome: String) -> bool:
 	for pz in posti:
 		if pz.uid == uid:
-			pz.nome = nome
+			if camp_gp.is_empty():
+				pz.nome = nome
+			pz["dentro"] = true
 			return true
+	if not camp_gp.is_empty():
+		# GP del campionato: il posto è del pilota con lo stesso nome, altrimenti il primo che aspetta ancora
+		for pz in posti:
+			if pz.tipo == "remoto" and not pz.get("dentro", false) and str(pz.get("pilota_n", "")).to_lower() == nome.strip_edges().to_lower():
+				pz.uid = uid
+				pz["dentro"] = true
+				return true
+		for pz in posti:
+			if pz.tipo == "remoto" and not pz.get("dentro", false):
+				pz.uid = uid
+				pz["dentro"] = true
+				return true
+		return false
 	for pz in posti:
 		if pz.tipo == "remoto" and pz.uid == "":
 			pz.uid = uid
 			pz.nome = nome
+			pz["dentro"] = true
 			return true
 	return false
 
 func esce_giocatore(uid: String) -> void:
 	for pz in posti:
 		if pz.uid == uid:
-			pz.uid = ""
-			pz.nome = ""
+			pz["dentro"] = false
+			if camp_gp.is_empty():
+				pz.uid = ""
+				pz.nome = ""
 
 func imposta_stanza(c: String, u: String, tex: Texture2D) -> void:
 	codice = c
@@ -700,6 +820,7 @@ func _via() -> void:
 		return
 	var av := regole == "avanzate"
 	var conf := {"regole": regole, "pista": Dati.PISTE[pista_n], "giri": giri, "auto": lista, "livello": livello, "stanza": stanza,
+		"tipo_stanza": tipo_stanza,
 		"opzioni": {"strada": strada, "meteo": av and meteo, "libero": av and libero and not strada, "qualifiche": qualifiche and not strada,
 			"abilita": av and (strada or abilita), "nitro": strada or nitro, "lari": av and lari and not strada, "kers": av and kers}}
 	if campionato:
